@@ -12,6 +12,7 @@ function User(id, mode) {
   this.extensionId = 0;
   this.accountId = 0;
   this.userName = ""
+  this.isAdmin = false
   this.extensionList = []
   this.startTime = 0
   this.readReport = {
@@ -78,47 +79,37 @@ var engine = User.prototype = {
             thisUser.savedPath = `downloads/${extensionId}/`
             if(!fs.existsSync(thisUser.savedPath)){
               fs.mkdirSync(thisUser.savedPath)
-            }else{
-              //console.log("unlink")
-              /*
-              var jsonFile = `${thisUser.savedPath}${extensionId}.json`
-              if (fs.existsSync(jsonFile))
-                fs.unlinkSync(jsonFile)
-              //fs.unlinkSync(`${thisUser.savedPath}recordings`)
-              var recordingPath = `${thisUser.savedPath}recordings`
-              if (fs.existsSync(recordingPath)) {
-                fs.readdirSync(recordingPath).forEach((file, index) => {
-                  const curPath = Path.join(recordingPath, file);
-                  fs.unlinkSync(curPath);
-                });
-              }
-              */
             }
-            callback(null, extensionId)
-            res.send('login success');
-
             rc_platform.getPlatform(function(err, p){
                 if (p != null){
                   p.get('/account/~/extension/~/')
                     .then(function(response) {
                       var jsonObj = response.json();
+                      //console.log(JSON.stringify(jsonObj))
+                      if (jsonObj.permissions.admin.enabled){
+                        thisUser.isAdmin = true
+                      }
                       thisUser.accountId = jsonObj.account.id
                       var fullName = jsonObj.contact.firstName + " " + jsonObj.contact.lastName
                       thisUser.setUserName(fullName)
+                      callback(null, extensionId)
+                      res.send('login success');
                     })
                     .catch(function(e) {
                       console.log("Failed")
                       console.error(e);
+                      res.send('login success');
                       callback("error", e.message)
                     });
                 }else{
                   console.log("CANNOT LOGIN")
+                  res.send('login success');
                   callback("error", thisUser.extensionId)
                 }
             })
-
           }else {
             console.log("USER HANDLER ERROR: " + thisUser.extensionId)
+            res.send('login success');
             callback("error", thisUser.extensionId)
           }
         })
@@ -198,7 +189,10 @@ var engine = User.prototype = {
       this.rc_platform.getPlatform(function(err, p){
         if (p != null){
           thisUser.startTime = Date.now()
-          p.get('/account/~/call-log', params)
+          var endpoint = '/account/~/extension/~/call-log'
+          if (thisUser.isAdmin)
+            endpoint = '/account/~/call-log'
+          p.get(endpoint, params)
               .then(function (resp) {
                 var jsonObj = resp.json()
                 thisUser.readReport.readInProgress = true
@@ -212,11 +206,13 @@ var engine = User.prototype = {
                   thisUser.readReport.readInProgress = false
                   thisUser.readReport.readInfo =  "Reading done!"
                   console.log("DONE - no next page")
-                  var fullNamePath = this.savedPath + thisUser.getExtensionId() + '.json'
+                  var fullNamePath = thisUser.savedPath + thisUser.getExtensionId() + '.json'
                   var fileContent = JSON.stringify(thisUser.callRecords)
+                  //console.log(fullNamePath)
+                  //console.log(fileContent)
                   thisUser.callRecords = []
                   try{
-                    fs.writeFileSync('./'+ fullNamePath, fileContent)
+                    fs.writeFileSync(fullNamePath, fileContent)
                   }catch(e){
                     console.log("cannot write file")
                   }
@@ -259,11 +255,11 @@ var engine = User.prototype = {
                 console.log("DONE - no more next page")
                 thisUser.readReport.readInProgress = false
                 thisUser.readReport.readInfo =  "Reading done!"
-                var fullNamePath = this.savedPath + thisUser.getExtensionId() + '.json'
+                var fullNamePath = thisUser.savedPath + thisUser.getExtensionId() + '.json'
                 var fileContent = JSON.stringify(thisUser.callRecords)
                 thisUser.callRecords = []
                 try{
-                  fs.writeFileSync('./'+ fullNamePath, fileContent)
+                  fs.writeFileSync(fullNamePath, fileContent)
                 }catch(e){
                   console.log("cannot write file")
                 }

@@ -1,17 +1,5 @@
 var path = require('path')
 var util = require('util')
-var multer  = require('multer')
-//var upload = multer({ dest: 'tempFile/' })
-
-var storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads')
-  },
-  filename: function (req, file, cb) {
-    cb(null, file.fieldname + '-' + file.originalname)
-  }
-})
-var upload = multer({ storage: storage })
 
 if('production' !== process.env.LOCAL_ENV )
   require('dotenv').load();
@@ -63,8 +51,7 @@ app.get('/index', function (req, res) {
     console.log('logout from here?')
     router.logout(req, res)
   }else {
-    //res.render('index')
-    router.loadSendHighVolumeSMSPage(req, res)
+    res.render('index')
   }
 })
 
