@@ -121,24 +121,6 @@ var router = module.exports = {
       return this.forceLogin(req, res)
     users[index].loadMainPage(req, res)
   },
-  loadSendSMSPage: function(req, res){
-    var index = getUserIndex(req.session.userId)
-    if (index < 0)
-      return this.forceLogin(req, res)
-    users[index].loadSendSMSPage(req, res)
-  },
-  loadSendHighVolumeSMSPage: function(req, res){
-    var index = getUserIndex(req.session.userId)
-    if (index < 0)
-      return this.forceLogin(req, res)
-    users[index].loadSendHighVolumeSMSPage(req, res)
-  },
-  setDelayInterVal: function(req, res){
-    var index = getUserIndex(req.session.userId)
-    if (index < 0)
-      return this.forceLogin(req, res)
-    users[index].setDelayInterVal(req, res)
-  },
   readAccountCallLog: function(req, res){
     var index = getUserIndex(req.session.userId)
     if (index < 0)
