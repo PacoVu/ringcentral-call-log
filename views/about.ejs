@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>RingCentral Call Log</title>
+        <link href="./img/favicon.ico" type="image/vnd.microsoft.icon" rel="shortcut icon">
+        <link href="./img/favicon.ico" type="image/vnd.microsoft.icon" rel="icon">
+        <script src="./js/jquery-3.1.0.min.js"></script>
+        <script src="./js/main.js"></script>
+        <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+        <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+        <link rel="stylesheet" href="./css/bootstrap.min.css">
+
+        <link rel="stylesheet" type="text/css" href="./css/main.css">
+        <link rel="stylesheet" type="text/css" href="./css/ui.css">
+    </head>
+    <body>
+      <nav id="menu_header" class="navbar navbar-default no-border">
+        <span class="left-middle-align">
+          <span class="rclogo"><a href="/"><img alt="Brand" src="img/ringcentral.png" height="40"></a></span>&nbsp;&nbsp;
+          <span class="title">Call Log</span>
+        </span>
+        <ul class="nav navbar-nav navbar-left left-align-nav">
+
+        </ul>
+        <ul class="nav navbar-nav navbar-right middle-align">
+          <li><a href="javascript:history.back()">Back</a></li>
+        </ul>
+      </nav>
+      <section id='content'>
+        <body>
+          <h3>Send toll-free SMS</h3>
+          <h4>Instructions:</h4>
+          <ol>
+              <li>Login with RingCentral account</li>
+              <li>Select a Toll-Free number from the <b>From number</b> dropdown</li>
+              <li>Provide a list of recipient number. Enter numbers separated by a new line or upload a .csv file (.cs file format is 1 column with header as "number")
+                  <div><b>Sample .csv file:</b></br>
+                    <span style="background:yellow">
+                      number</br>
+                      +11234567890</br>
+                      +14087654322</br>
+                      +16501234567</br>
+                    </span>
+                  </div>
+              </li>
+              <li>Compose the SMS message</li>
+              <li>Click the <b>Send</b> to send</li>
+          </ol>
+          <div>
+            Get the project's source code from <a href="https://github.com/PacoVu/ringcentral-send-tollfree-sms">Github repo</a>
+          </div>
+        </body>
+      </section>
+      <%- include('_footer') %>
+    </body>
+</html>
