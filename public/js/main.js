@@ -87,16 +87,17 @@ function disableInputs(flag){
   $("#fromdatepicker").prop("disabled", flag);
   $("#todatepicker").prop("disabled", flag);
   $("#readcalllogs").prop("disabled", flag);
-
+  $("#progress").css("display", "block")
+  
   if (flag){
     //$("#progress").toggleClass("show")
-    $("#progress").css("display", "block")
+
     $("#readingAni").css('display', 'inline');
     //$("#download_json").toggleClass("hide")
     $("#download_csv").toggleClass("hide")
   }else{
     //$("#progress").toggleClass("hide")
-    $("#progress").css("display", "none")
+    //$("#progress").css("display", "none")
     $("#readingAni").css('display', 'none');
     //$("#download_json").toggleClass("show")
     $("#download_csv").toggleClass("show")
