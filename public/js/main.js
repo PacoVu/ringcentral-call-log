@@ -88,19 +88,19 @@ function disableInputs(flag){
   $("#todatepicker").prop("disabled", flag);
   $("#readcalllogs").prop("disabled", flag);
   $("#progress").css("display", "block")
-  
+
   if (flag){
     //$("#progress").toggleClass("show")
 
     $("#readingAni").css('display', 'inline');
     //$("#download_json").toggleClass("hide")
-    $("#download_csv").toggleClass("hide")
+    $("#download_csv").css('display', 'none');
   }else{
     //$("#progress").toggleClass("hide")
     //$("#progress").css("display", "none")
     $("#readingAni").css('display', 'none');
     //$("#download_json").toggleClass("show")
-    $("#download_csv").toggleClass("show")
+    $("#download_csv").css('display', 'block');
   }
 }
 
