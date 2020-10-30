@@ -32,13 +32,21 @@
   <section id='content'>
       <form class="form-inline">
         <div class="form-group">
+
           <label for="fromDate">From Date</label>
             <input type="text" id="fromdatepicker" class="form-control text-input"></input>&nbsp;&nbsp;
           <label for="toDate">To Date</label>
             <input type="text" id="todatepicker" class="form-control text-input"></input>&nbsp;
-          <select class="selectpicker filter-select" id="view" style="display: inline" title="View">
+
+          <select class="selectpicker filter-select " id="view" style="display: inline" title="View">
             <option value="Simple" selected>Simple</option>
             <option value="Detailed">Detailed</option>
+          </select>
+
+          <select class="selectpicker filter-select" multiple="multiple" id="attachments" style="display: inline" title="Select">
+            <option value="recordings">Recorded Calls (.mp3)</option>
+            <option value="voicemail">Voicemail (.mp3)</option>
+            <!--option value="faxes">Faxes (.pdf))</option-->
           </select>
           <!--
           <% if (userLevel == 'admin') { %>
@@ -50,17 +58,18 @@
             </select>
           <% } %>
           -->
-          <button id="readcalllogs" class="btn-rc" onclick="readCallLogs()" style="display:inline">Read Call Logs</button>
+          <button id="readcalllogs" class="btn-rc" onclick="readCallLogs()" style="display:inline">Read Call Log</button>
         </div>
       </form>
       <br/>
       <div id="progress" class="hide">
         <span><b>Read Call Log Progress</b></span>&nbsp;&nbsp;
         <img src='./img/loading.gif' id="readingAni" style='width:30px;height:30px;display: none'></img>
-        <div id="time"></div>
+        <div id="info"></div>
         <div id="records-count"></div>
-        <a id="download_json" href="javascript:downloadCallLog('JSON')" style="display: none">Download Call Log (JSON)</a>
-        <!--a id="download_csv" href="javascript:downloadReport('CSV')" style="display: none">Download Call Log (CSV)</a-->
+        <div id="attachments-count"></div>
+        <!--a id="download_json" href="javascript:downloadCallLog('JSON')" style="display: none">Download Call Log (JSON)</a-->
+        <a id="download_csv" href="javascript:downloadCallLog('CSV')" style="display: none">Download Call Log (.zip)</a>
       </div>
   </section>
   <%- include('_footer') %>

@@ -17,12 +17,24 @@ function User(id, mode) {
   this.startTime = 0
   this.readReport = {
     readInProgress: false,
+    downloadBinaryInProgress: false,
     readInfo: "",
-    recordsCount: ""
+    recordsCount: 0,
+    attachmentCount: 0,
+    downloadCount: 0
   }
   this.mainCompanyNumber = ""
+  this.csvContent = ""
   this.callRecords = []
-  this.downloadPath = ""
+  this.recordingUrls = []
+  this.voicemailUrls = []
+  this.attachmentUrls = []
+  this.savedPath = ""
+  this.viewMode = "Simple"
+  this.attachments = []
+  this.downloadRecording = false
+  this.downloadVoicemail = false
+  this.download.attachment = false
   this.rc_platform = new RCPlatform(this, mode)
 
   return this
@@ -92,8 +104,13 @@ var engine = User.prototype = {
                       thisUser.accountId = jsonObj.account.id
                       var fullName = jsonObj.contact.firstName + " " + jsonObj.contact.lastName
                       thisUser.setUserName(fullName)
-                      callback(null, extensionId)
-                      res.send('login success');
+                      thisUser.extensionList = []
+                      thisUser.getAccountExtensions("", (err, result) =>{
+                        //console.log(JSON.stringify(thisUser.extensionList))
+                        callback(null, extensionId)
+                        res.send('login success');
+                      })
+
                     })
                     .catch(function(e) {
                       console.log("Failed")
@@ -118,12 +135,20 @@ var engine = User.prototype = {
         callback("error", null)
       }
     },
-    getAccountExtensions: function (){
+    getAccountExtensions: function (uri, callback){
       var endpoint = '/account/~/extension'
+      if (this.isAdmin == false)
+        endpoint = '/account/~/extension/~/extension'
+
       var params = {
           status: "Enabled",
           type: "User",
           perPage: 1000
+      }
+
+      if (uri != ""){
+        endpoint = uri
+        params = {}
       }
 
       var thisUser = this
@@ -131,17 +156,20 @@ var engine = User.prototype = {
         if (p != null){
           p.get(endpoint, params)
             .then(function(resp){
-              var json = resp.json()
+              var jsonObj = resp.json()
               var extensionList = []
-              for (var record of json.records){
+              for (var record of jsonObj.records){
                 var item = {}
                 item['id'] = record.id
-                item['extNum'] = record.extensionNumber.toString()
-                item['fullName'] = record.contact.firstName + " " + record.contact.lastName
+                //item['extNum'] = record.extensionNumber.toString() + " - "
+                item['name'] =`${record.extensionNumber} - ${record.contact.firstName} ${record.contact.lastName}`
                 //console.log(item.fullName)
-                extensionList.push(item)
+                thisUser.extensionList.push(item)
               }
-              thisUser.setUserExtensionList(extensionList)
+              if (jsonObj.navigation.hasOwnProperty("nextPage"))
+                thisUser.readAccountExtensions(jsonObj.navigation.nextPage.uri, callback)
+              else
+                callback(null, "readAccountExtensions: DONE")
             })
             .catch(function(e){
               throw e
@@ -152,12 +180,31 @@ var engine = User.prototype = {
     },
     pollReadCallLogResult: function(req, res){
       console.log(this.readReport)
+      /*
+      if (this.readReport.downloadCount == this.readReport.attachmentCount){
+        console.log("all files are downloaded")
+        this.readReport.readInProgress = false
+      }
+      */
       res.send(this.readReport)
     },
     readAccountCallLog: function(req, res){
       var thisRes = res
       var thisUser = this
-
+      this.viewMode = req.body.view
+      var attachments = JSON.parse(req.body.attachments)
+      this.downloadRecording = false
+      this.downloadVoicemail = false
+      this.downloadAttachements = false
+      for (var att of attachments){
+        if (att == "recordings")
+          this.downloadRecording = true
+        else if (att == "voicemail")
+          this.downloadVoicemail = true
+        else if (att == "faxes")
+          this.downloadAttachements = true
+      }
+      console.log(this.attachments)
       var params = {
         view: req.body.view,
         dateFrom: req.body.dateFrom,
@@ -166,18 +213,37 @@ var engine = User.prototype = {
         perPage: 1000
       }
       // return and poll for result
-      thisUser.readReport.readInProgress = true
-      thisUser.readReport.readInfo =  "Reading first page"
-      thisUser.readReport.recordsCount = 0
+      this.readReport.readInProgress = true
+      this.downloadBinaryInProgress = false
+      this.readReport.readInfo =  "Reading first page"
+      this.readReport.recordsCount = 0
+      this.readReport.downloadCount = 0
+      this.readReport.attachmentCount = 0
+      this.csvContent = ""
+      this.attachmentUrls = []
 
       var jsonFile = `${thisUser.savedPath}${this.getExtensionId()}.json`
       if (fs.existsSync(jsonFile))
         fs.unlinkSync(jsonFile)
 
-      var recordingPath = `${thisUser.savedPath}recordings`
-      if (fs.existsSync(recordingPath)) {
-        fs.readdirSync(recordingPath).forEach((file, index) => {
-          const curPath = Path.join(recordingPath, file);
+      var subfolder = `${thisUser.savedPath}recordings`
+      if (fs.existsSync(subfolder)) {
+        fs.readdirSync(subfolder).forEach((file, index) => {
+          const curPath = Path.join(subfolder, file);
+          fs.unlinkSync(curPath);
+        });
+      }
+      subfolder = `${thisUser.savedPath}voicemail`
+      if (fs.existsSync(subfolder)) {
+        fs.readdirSync(subfolder).forEach((file, index) => {
+          const curPath = Path.join(subfolder, file);
+          fs.unlinkSync(curPath);
+        });
+      }
+      subfolder = `${thisUser.savedPath}faxes`
+      if (fs.existsSync(subfolder)) {
+        fs.readdirSync(subfolder).forEach((file, index) => {
+          const curPath = Path.join(subfolder, file);
           fs.unlinkSync(curPath);
         });
       }
@@ -203,19 +269,42 @@ var engine = User.prototype = {
                 if (navigationObj.hasOwnProperty("nextPage")){
                   thisUser.readCallLogNextPage(navigationObj.nextPage.uri)
                 }else{
-                  thisUser.readReport.readInProgress = false
-                  thisUser.readReport.readInfo =  "Reading done!"
-                  console.log("DONE - no next page")
+                  //thisUser.downloadAttachements(p)
+
+                  var fullFilePath = `${thisUser.savedPath}${thisUser.getExtensionId()}.csv`
+                  if(fs.existsSync(fullFilePath)){
+                    fs.unlinkSync(fullFilePath)
+                  }
+                  fs.writeFile(fullFilePath, thisUser.csvContent, function(err) {
+                    if(err)
+                      console.log(err);
+                    else
+                      console.log("download file is ready.");
+                      console.log("DONE - no next page")
+                      //if (thisUser.attachmentUrls.length){
+                      //  thisUser.downloadFaxAttachements(p)
+                      //}else
+
+                      thisUser.readReport.readInProgress = false
+                      if (this.readReport.downloadCount == this.readReport.attachmentCount){
+                        console.log("all files are downloaded")
+                        this.downloadBinaryInProgress = false
+                      }
+
+                      //thisUser.readReport.readInProgress = false
+                      thisUser.readReport.readInfo =  "Reading done!"
+                      thisUser.csvContent = ""
+                  })
+                  /*
                   var fullNamePath = thisUser.savedPath + thisUser.getExtensionId() + '.json'
                   var fileContent = JSON.stringify(thisUser.callRecords)
-                  //console.log(fullNamePath)
-                  //console.log(fileContent)
                   thisUser.callRecords = []
                   try{
                     fs.writeFileSync(fullNamePath, fileContent)
                   }catch(e){
                     console.log("cannot write file")
                   }
+                  */
                 }
               });
         }
@@ -252,9 +341,31 @@ var engine = User.prototype = {
                     thisUser.readCallLogNextPage(navigationObj.nextPage.uri)
                 }, delayInterval)
               }else{
-                console.log("DONE - no more next page")
-                thisUser.readReport.readInProgress = false
-                thisUser.readReport.readInfo =  "Reading done!"
+                //thisUser.downloadAttachements(p)
+
+                var fullFilePath = `${thisUser.savedPath}${thisUser.getExtensionId()}.csv`
+                if(fs.existsSync(fullFilePath)){
+                  fs.unlinkSync(fullFilePath)
+                }
+                fs.writeFile(fullFilePath, thisUser.csvContent, function(err) {
+                  if(err)
+                    console.log(err);
+                  else
+                    console.log("download file is ready.");
+                    console.log("DONE - no more next page")
+                    //if (thisUser.attachmentUrls.length){
+                    //  thisUser.downloadFaxAttachements(p)
+                    //}else
+                    thisUser.readReport.readInProgress = false
+
+                    if (thisUser.readReport.downloadCount == thisUser.readReport.attachmentCount){
+                      console.log("all files are downloaded")
+                      thisUser.downloadBinaryInProgress = false
+                    }
+                    thisUser.readReport.readInfo =  "Reading done!"
+                    thisUser.csvContent = ""
+                })
+                /*
                 var fullNamePath = thisUser.savedPath + thisUser.getExtensionId() + '.json'
                 var fileContent = JSON.stringify(thisUser.callRecords)
                 thisUser.callRecords = []
@@ -263,20 +374,96 @@ var engine = User.prototype = {
                 }catch(e){
                   console.log("cannot write file")
                 }
+                */
               }
             });
         }
       })
     },
+    parseCallRecords_no_download: function(p, records){
+      for (var record of records) {
+          this.detailedCSVFormat()
+          //this.callRecords.push(record)
+          if (record.hasOwnProperty("message")){
+            if (record.message.type == "VoiceMail"){
+              var voicemailUri = record.message.uri.replace("platform", "media")
+              var fileName = record.message.id + '.mp3'
+              var item = {
+                fileName: record.message.id + '.mp3',
+                url: voicemailUri
+              }
+              this.voicemailUrls.push(item)
+            }else if (record.message.type == "Fax"){
+              var messageUri = record.message.uri
+              this.attachmentUrls.push(messageUri)
+            }
+          }else if (record.hasOwnProperty("recording")){
+            // download binary content to local file
+            var fileName = record.recording.id + '.mp3'
+            var item = {
+              fileName: record.recording.id + '.mp3',
+              url: voicemailUri
+            }
+            this.recordingUrls.push(item)
+          }
+        }
+    },
     parseCallRecords: function(p, records){
       var thisUser = this
       async.each(records,
         function(record, callback){
-          thisUser.callRecords.push(record)
-          if (record.hasOwnProperty("recording")){
+          //thisUser.callRecords.push(record)
+          var attachment = ""
+          if (record.hasOwnProperty("message")){
+            if (record.message.type == "VoiceMail" && thisUser.downloadVoicemail){
+              var voicemailUri = record.message.uri.replace("platform", "media")
+              var fileName = record.message.id + '.mp3'
+              attachment = "voicemail/" + fileName
+              thisUser.readReport.attachmentCount++
+              thisUser.downloadBinaryInProgress = true
+              thisUser.saveBinaryFile(p, "voicemail", fileName, voicemailUri)
+            }else if (record.message.type == "Fax" && thisUser.downloadAttachements){
+              if (record.direction == "Outbound" && record.result == "Sent"){
+                console.log("++++++")
+                console.log(JSON.stringify(record))
+                console.log("++++++")
+                var messageUri = record.message.uri
+                //thisUser.readReport.attachmentCount++
+                thisUser.attachmentUrls.push(messageUri)
+              }
+              /*
+              var messageUri = record.message.uri
+              p.get(messageUri)
+                .then(function (resp) {
+                  var jsonObj = resp.json()
+                  async.each(jsonObj.attachments,
+                    function(attachment, callback){
+                      // check message avail
+                      //if (record.message.id == "1070752210016" || record.message.id == "1070816817016"){
+                        console.log("======")
+                        console.log(JSON.stringify(attachment))
+                        console.log("======")
+                      //}
+
+                    })
+                })
+                .catch(function(e){
+                  console.log(e)
+                })
+              */
+            }
+          }else if (record.hasOwnProperty("recording") && thisUser.downloadRecording){
             // download binary content to local file
-            thisUser.saveBinaryFile(p, "recordings", record.recording.id, record.recording.contentUri)
+            var fileName = record.recording.id + '.mp3'
+            attachment = "recordings/" + fileName
+            thisUser.readReport.attachmentCount++
+            thisUser.downloadBinaryInProgress = true
+            thisUser.saveBinaryFile(p, "recordings", fileName, record.recording.contentUri)
           }
+          if (thisUser.viewMode == "Simple")
+            thisUser.simpleCSVFormat(record, attachment)
+          else
+            thisUser.detailedCSVFormat(record, attachment)
           callback(null, null)
         },
         function (err){
@@ -285,7 +472,179 @@ var engine = User.prototype = {
         }
       )
     },
-    saveBinaryFile: function(p, type, id, contentUri){
+    downloadFaxAttachements: function(p){
+      var thisUser = this
+      for (var uri of this.attachmentUrls){
+        p.get(uri)
+          .then(function (resp) {
+            var jsonObj = resp.json()
+            async.each(jsonObj.attachments,
+              function(attachment, callback){
+                var fileNameExt = attachment.contentType.split("/")
+                var fileName = attachment.id + "." + fileNameExt[1]
+                thisUser.readReport.attachmentCount++
+                thisUser.saveBinaryFile(p, "faxes", fileName, attachment.uri)
+              })
+          })
+          .catch(function(e){
+            console.log("======")
+            console.log(uri)
+            console.log(e.message)
+          })
+      }
+    },
+    simpleCSVFormat: function(record, attachment){
+      if (this.csvContent == "")
+        this.csvContent = '"Type","Phone Number","Name","Date","Time","Action","Action Result","Result Description","Duration","Attachment"'
+      this.csvContent += "\r\n" + record.type
+      if (record.direction == "Outbound"){
+        if (record.hasOwnProperty('to')){
+          var temp = (record.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(record.to.phoneNumber) : ""
+          if (temp == "")
+            temp = (record.to.hasOwnProperty('extensionNumber')) ? record.to.extensionNumber : ""
+          this.csvContent += "," +  temp
+          temp = (record.to.hasOwnProperty('name')) ? record.to.name : ""
+          this.csvContent += "," + temp
+        }else{
+          this.csvContent += ","
+        }
+      }else{
+        if (record.hasOwnProperty('from')){
+          var temp = (record.from.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(record.from.phoneNumber) : ""
+          if (temp == "")
+            temp = (record.from.hasOwnProperty('extensionNumber')) ? record.from.extensionNumber : ""
+          this.csvContent += "," +  temp
+          temp = (record.from.hasOwnProperty('name')) ? record.from.name : ""
+          this.csvContent += "," + temp
+        }else{
+          this.csvContent += ","
+        }
+      }
+      let dateOptions = { weekday: 'short' }
+      let timeOptions = { hour: '2-digit',minute: '2-digit' }
+      var date = new Date(record.startTime)
+      var dateStr = date.toLocaleDateString("en-US", dateOptions)
+      dateStr += " " + date.toLocaleDateString("en-US")
+      this.csvContent += "," + dateStr
+      this.csvContent += "," + date.toLocaleTimeString("en-US")
+      this.csvContent += "," + record.action + "," + record.result
+      var desc = (record.hasOwnProperty('reasonDescription')) ? record.reasonDescription : ""
+      this.csvContent += "," + desc
+      this.csvContent += "," + formatDurationTime(record.duration)
+      this.csvContent += "," + attachment
+    },
+    detailedCSVFormat: function(record, attachment){
+      if (this.csvContent == "")
+        this.csvContent = '"Type","Direction","From","To","Extension","Forwarded To","Name","Date","Time","Action","Action Result","Result Description","Duration","Included","Purchased","Attachment"'
+
+        //console.log(JSON.stringify(record))
+        //console.log("====")
+        //var extensionNum = (record.to.hasOwnProperty("extensionNumber")) ? record.to.extensionNumber : ""
+        //extensionNum = (record.to.hasOwnProperty("name")) ? `${extensionNum} - ${record.to.name}` : extensionNum
+        for (var item of record.legs){
+          if (item.hasOwnProperty('master'))
+            this.csvContent += "\r\n" + item.type
+          else
+            this.csvContent += "\r\n"
+          if (item.direction == "Outbound"){
+            this.csvContent += ",Outgoing"
+            // from
+            if (item.hasOwnProperty('from')){
+              var temp = (item.from.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.from.phoneNumber) : ""
+              if (temp == "")
+                temp = (item.from.hasOwnProperty('extensionNumber')) ? item.from.extensionNumber : ""
+              this.csvContent += "," +  temp
+            }else{
+              this.csvContent += ","
+            }
+            // to
+            if (item.hasOwnProperty('to')){
+              var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
+              if (temp == "")
+                temp = (item.to.hasOwnProperty('extensionNumber')) ? item.to.extensionNumber : ""
+              this.csvContent += "," +  temp
+            }else{
+              this.csvContent += ","
+            }
+          }else{
+            this.csvContent += ",Incoming"
+            // from
+            if (item.hasOwnProperty('from')){
+              var temp = (item.from.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.from.phoneNumber) : ""
+              if (temp == "")
+                temp = (item.from.hasOwnProperty('extensionNumber')) ? item.from.extensionNumber : ""
+              this.csvContent += "," +  temp
+            }else{
+              this.csvContent += ","
+            }
+            // to
+            if (item.hasOwnProperty('to')){
+              var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
+              if (temp == "")
+                temp = (item.to.hasOwnProperty('extensionNumber')) ? item.to.extensionNumber : ""
+              this.csvContent += "," +  temp
+            }else{
+              this.csvContent += ","
+            }
+          }
+
+          // extension
+          if (item.hasOwnProperty('extension')){
+            var extObj = this.extensionList.find(o => o.id === item.extension.id)
+            if (extObj)
+              this.csvContent += "," + extObj.name
+            else
+              this.csvContent += ","
+          }else{
+            this.csvContent += ","
+          }
+
+          // Forwarded to
+          if (record.direction == "Inbound" && item.direction == "Outbound"){
+            var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
+            this.csvContent += "," + temp
+          }else
+            this.csvContent += ","
+
+          // Name
+          if (item.direction == "Outbound"){
+            var temp = ""
+            if (item.hasOwnProperty('to')){
+              var temp = (item.to.hasOwnProperty('name')) ? item.to.name : ""
+            }
+            this.csvContent += "," + temp
+          }else{
+            var temp = ""
+            if (item.hasOwnProperty('from')){
+              temp = (item.from.hasOwnProperty('name')) ? item.from.name : ""
+            }
+            this.csvContent += "," + temp
+          }
+
+          let dateOptions = { weekday: 'short' }
+          let timeOptions = { hour: '2-digit',minute: '2-digit' }
+          var date = new Date(item.startTime)
+          var dateStr = date.toLocaleDateString("en-US", dateOptions)
+          dateStr += " " + date.toLocaleDateString("en-US")
+          this.csvContent += "," + dateStr
+          this.csvContent += "," + date.toLocaleTimeString("en-US")
+          this.csvContent += "," + item.action + "," + item.result
+          var desc = (item.hasOwnProperty('reasonDescription')) ? item.reasonDescription : ""
+          this.csvContent += "," + desc
+          this.csvContent += "," + formatDurationTime(item.duration)
+
+          if (record.direction == item.direction){
+            // included
+            this.csvContent += "," + record.billing.costIncluded
+            // purchased
+            this.csvContent += "," + record.billing.costPurchased
+          }else{
+            this.csvContent += ",-,-"
+          }
+          this.csvContent += "," + attachment
+        }
+    },
+    saveBinaryFile: function(p, type, fileName, contentUri){
       console.log("saveBinaryFile")
       var dir = this.savedPath + type + "/"
       if(!fs.existsSync(dir)){
@@ -293,9 +652,14 @@ var engine = User.prototype = {
       }
       var thisUser = this
       var uri = p.createUrl(contentUri, {addToken: true});
-      var fullNamePath = dir + id + '.mp3'
+      var fullNamePath = dir + fileName
       console.log(fullNamePath)
       this.download(uri, fullNamePath, function(){
+        thisUser.readReport.downloadCount++
+        if (thisUser.readReport.downloadCount == thisUser.readReport.attachmentCount){
+          console.log("all files are downloaded: DOWNLOAD")
+          thisUser.downloadBinaryInProgress = false
+        }
         console.log("Save file to the local machine. " + fullNamePath)
       })
     },
@@ -309,37 +673,135 @@ var engine = User.prototype = {
       });
     },
     downloadCallLog: function(req, res){
-
-      //var fullNamePath = this.savedPath + this.getExtensionId() + '.json'
-      //var fileContent = JSON.stringify(this.callRecords)
-      try{
-        //fs.writeFileSync('./'+ fullNamePath, fileContent)
-
+      if (req.query.format == "CSV"){
         var zipFile = "CallLog_"+this.getExtensionId() + ".zip"
         zipper.sync.zip("./"+this.savedPath).compress().save(zipFile);
 
         var link = "/downloads?filename=" + zipFile
         res.send({"status":"ok","message":link})
         /*
-        console.log("unlink")
-        var jsonFile = `${this.savedPath}${this.getExtensionId()}.json`
-        if (fs.existsSync(jsonFile))
-          fs.unlinkSync(jsonFile)
+        var fullFilePath = `${this.savedPath}${this.getExtensionId()}.csv`
+        if(fs.existsSync(fullFilePath)){
+          fs.unlinkSync(fullFilePath)
+        }
+        var thisUser = this
+        fs.writeFile(fullFilePath, this.csvContent, function(err) {
+          if(err)
+            console.log(err);
+          else
+            console.log("download file is ready.");
+          var zipFile = "CallLog_"+thisUser.getExtensionId() + ".zip"
+          zipper.sync.zip("./"+thisUser.savedPath).compress().save(zipFile);
 
-        var recordingPath = `${this.savedPath}recordings`
-        if (fs.existsSync(recordingPath)) {
-          fs.readdirSync(recordingPath).forEach((file, index) => {
-            const curPath = Path.join(recordingPath, file);
-            fs.unlinkSync(curPath);
-          });
+          var link = "/downloads?filename=" + zipFile
+          res.send({"status":"ok","message":link})
+        })
+        */
+        /*
+        var thisUser = this
+        if (this.viewMode == "Simple"){
+          this.createSimpleCSVFormat((err, result) =>{
+            if (err == null){
+              var zipFile = "CallLog_"+thisUser.getExtensionId() + ".zip"
+              zipper.sync.zip("./"+thisUser.savedPath).compress().save(zipFile);
+
+              var link = "/downloads?filename=" + zipFile
+              res.send({"status":"ok","message":link})
+            }
+          })
+        }else{
+          this.createDetailedCSVFormat((err, result) =>{
+            if (err == null){
+              var zipFile = "CallLog_"+thisUser.getExtensionId() + ".zip"
+              zipper.sync.zip("./"+thisUser.savedPath).compress().save(zipFile);
+
+              var link = "/downloads?filename=" + zipFile
+              res.send({"status":"ok","message":link})
+            }
+          })
         }
         */
-      }catch (e){
-        console.log("cannot create download file")
-        res.send({"status":"failed","message":"Cannot create a call log file! Please try gain"})
+      }else{
+        var fullFilePath = `${this.savedPath}${this.getExtensionId()}.json`
+        if(fs.existsSync(fullFilePath)){
+          fs.unlinkSync(fullFilePath)
+        }
+        var fileContent = JSON.stringify(this.callRecords)
+        try{
+          fs.writeFileSync('./'+ fullNamePath, fileContent)
+
+          var zipFile = "CallLog_"+this.getExtensionId() + ".zip"
+          zipper.sync.zip("./"+this.savedPath).compress().save(zipFile);
+
+          var link = "/downloads?filename=" + zipFile
+          res.send({"status":"ok","message":link})
+          /*
+          console.log("unlink")
+          var jsonFile = `${this.savedPath}${this.getExtensionId()}.json`
+          if (fs.existsSync(jsonFile))
+            fs.unlinkSync(jsonFile)
+
+          var recordingPath = `${this.savedPath}recordings`
+          if (fs.existsSync(recordingPath)) {
+            fs.readdirSync(recordingPath).forEach((file, index) => {
+              const curPath = Path.join(recordingPath, file);
+              fs.unlinkSync(curPath);
+            });
+          }
+          */
+        }catch (e){
+          console.log("cannot create download file")
+          res.send({"status":"failed","message":"Cannot create a call log file! Please try gain"})
+        }
       }
     },
+    downloadAttachements: function(platform){
+      var thisUser = this
+      var dir = this.savedPath + "recordings/"
+      if(!fs.existsSync(dir)){
+        fs.mkdirSync(dir)
+      }
+      async.waterfall([
+          this._dl_function(platform, dir, this.recordingUrls)
+        ], function (error, success) {
+            if (error) {
+              console.log('Something is wrong!');
+            }
+            /*
+            thisUser.extIndex++
+            if (thisUser.extIndex < extList.length){
+              setTimeout(function(){
+                thisUser.readExtensionCallLog(body, extList, res)
+              }, 1000)
+              */
+            //}else{
+              console.log('Done download atachments!');
+              thisUser.readReport.readInProgress = false
+              thisUser.readReport.readInfo =  "Reading done!"
 
+            //}
+        });
+    },
+    _dl_function: function(p, dir, recordingUrlList) {
+      return function (callback) {
+        async.each(recordingUrlList,
+          function(record, callback0){
+            console.log("saveBinaryFile")
+
+            var thisUser = this
+            var uri = p.createUrl(record.url, {addToken: true});
+            var fullNamePath = dir + record.fileName
+            console.log(fullNamePath)
+            downloadFile(uri, fullNamePath, function(){
+              console.log("Save file to the local machine. " + fullNamePath)
+              return callback0(null, "")
+            })
+          },
+          function (err){
+            return callback (null, "");
+          })
+       }
+    },
     readExtensionCallLog: function(body, extList, res){
       var ext = extList[this.extIndex]
       var endpoint = '/account/~/extension/'+ ext.id +'/call-log'
@@ -584,9 +1046,9 @@ function getBatchReport(batchId, pageToken, callback){
 }
 */
 
-function formatSendingTime(processingTime){
+function formatDurationTime(processingTime){
   var hour = Math.floor(processingTime / 3600)
-  hour = (hour < 10) ? "0"+hour : hour
+  //hour = (hour < 10) ? "0"+hour : hour
   var mins = Math.floor((processingTime % 3600) / 60)
   mins = (mins < 10) ? "0"+mins : mins
   var secs = Math.floor(((processingTime % 3600) % 60))
@@ -618,8 +1080,8 @@ function formatPhoneNumber(phoneNumberString) {
   var cleaned = ('' + phoneNumberString).replace(/\D/g, '')
   var match = cleaned.match(/^(1|)?(\d{3})(\d{3})(\d{4})$/)
   if (match) {
-    var intlCode = (match[1] ? '+1 ' : '')
-    return [intlCode, '(', match[2], ') ', match[3], '-', match[4]].join('')
+    //var intlCode = (match[1] ? '+1 ' : '')
+    return ['(', match[2], ') ', match[3], '-', match[4]].join('')
   }
   return phoneNumberString
 }
@@ -658,4 +1120,26 @@ function post_message_to_group(params, mainCompanyNumber, accountId){
   //console.log(data)
   post_req.write(JSON.stringify(body));
   post_req.end();
+}
+
+function checkFileExistance(fs, pathAndFile){
+  var flag = true
+  try {
+    console.log("existed")
+    fs.accessSync(pathAndFile, fs.F_OK)
+  }catch(e){
+    console.log("none existed")
+    flag = false
+  }
+  return flag
+}
+const downloadFile = function(uri, dest, cb) {
+  console.log("downloadFile " + dest)
+  var file = fs.createWriteStream(dest);
+  var request = https.get(uri, function(response) {
+      response.pipe(file);
+      file.on('finish', function() {
+          file.close(cb);
+      });
+  });
 }

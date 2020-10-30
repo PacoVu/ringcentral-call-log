@@ -1,4 +1,4 @@
-var canPoll = false
+//var canPoll = false
 function init(){
   /*
   var jsonObj = JSON.parse(window.sendReport)
@@ -22,11 +22,14 @@ function init(){
   $( "#fromdatepicker" ).datepicker('setDate', new Date(year, month, day));
   $( "#todatepicker" ).datepicker('setDate', new Date());
 }
+
 function readCallLogs(){
+  //disableInputs(true)
+  /*
   $("#fromdatepicker").prop("disabled", true);
   $("#todatepicker").prop("disabled", true);
   $("#readcalllogs").prop("disabled", true);
-
+  */
   var configs = {}
   configs['dateFrom'] = $("#fromdatepicker").val() + "T00:00:00.001Z"
   var gmtTime = $("#todatepicker").val()
@@ -39,16 +42,18 @@ function readCallLogs(){
     configs['extensionList'] = [];
   }
   configs['view'] = $("#view").val()
+  configs['attachments'] = JSON.stringify($('#attachments').val());
   //return alert (JSON.stringify(configs))
   var url = "readlogs"
   var posting = $.post( url, configs );
+  disableInputs(true)
   posting.done(function( response ) {
     var res = JSON.parse(response)
     if (res.status != "ok") {
       alert(res.calllog_error)
     }else{
-      $("#progress").toggleClass("show")
-      $("#readingAni").css('display', 'inline');
+      //$("#progress").toggleClass("show")
+      //$("#readingAni").css('display', 'inline');
       pollResult()
       //window.location = "recordedcalls"
     }
@@ -61,33 +66,38 @@ function readCallLogs(){
 function pollResult(){
   var url = "pollresult"
   var getting = $.get( url );
-  canPoll = true
+  // = true
   getting.done(function( res ) {
-    if (res.readInProgress == true) {
+    if (res.readInProgress || res.downloadBinaryInProgress) {
       window.setTimeout(function(){
-        if (canPoll)
+        //if (canPoll)
           pollResult()
       }, 1000)
     }else{
       disableInputs(false)
     }
-    $("#time").html(res.readInfo)
-    $("#records-count").html("Read " + res.recordsCount)
+    $("#info").html(res.readInfo)
+    $("#records-count").html("Read " + res.recordsCount + " records.")
+    $("#attachments-count").html("Download " + res.attachmentCount + " attachments." )
   });
 }
 
 function disableInputs(flag){
-
+  //$("#readcalllogs").prop("disabled", flag);
+  $("#fromdatepicker").prop("disabled", flag);
+  $("#todatepicker").prop("disabled", flag);
   $("#readcalllogs").prop("disabled", flag);
 
   if (flag){
+    $("#progress").toggleClass("show")
     $("#readingAni").css('display', 'inline');
-    $("#download_json").toggleClass("hide")
-    //$("#download_csv").toggleClass("hide")
+    //$("#download_json").toggleClass("hide")
+    $("#download_csv").toggleClass("hide")
   }else{
+    $("#progress").toggleClass("hide")
     $("#readingAni").css('display', 'none');
-    $("#download_json").toggleClass("show")
-    //$("#download_csv").toggleClass("show")
+    //$("#download_json").toggleClass("show")
+    $("#download_csv").toggleClass("show")
   }
 }
 
