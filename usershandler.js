@@ -286,9 +286,9 @@ var engine = User.prototype = {
                       //}else
 
                       thisUser.readReport.readInProgress = false
-                      if (this.readReport.downloadCount == this.readReport.attachmentCount){
+                      if (thisUser.readReport.downloadCount == thisUser.readReport.attachmentCount){
                         console.log("all files are downloaded")
-                        this.downloadBinaryInProgress = false
+                        thisUser.downloadBinaryInProgress = false
                       }
 
                       //thisUser.readReport.readInProgress = false
