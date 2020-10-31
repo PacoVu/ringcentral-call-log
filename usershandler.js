@@ -97,20 +97,26 @@ var engine = User.prototype = {
                   p.get('/account/~/extension/~/')
                     .then(function(response) {
                       var jsonObj = response.json();
-                      //console.log(JSON.stringify(jsonObj))
-                      if (jsonObj.permissions.admin.enabled){
-                        thisUser.isAdmin = true
-                      }
+
                       thisUser.accountId = jsonObj.account.id
-                      var fullName = jsonObj.contact.firstName + " " + jsonObj.contact.lastName
+                      var fullName = (jsonObj.contact.hasOwnProperty("firstName")) ? `${jsonObj.contact.firstName} ` : ""
+                      fullName += (jsonObj.contact.hasOwnProperty("lastName")) ? jsonObj.contact.lastName : ""
                       thisUser.setUserName(fullName)
                       thisUser.extensionList = []
-                      thisUser.getAccountExtensions("", (err, result) =>{
-                        //console.log(JSON.stringify(thisUser.extensionList))
+                      if (jsonObj.permissions.admin.enabled){
+                        thisUser.isAdmin = true
+                        thisUser.getAccountExtensions("", (err, result) =>{
+                          callback(null, extensionId)
+                          res.send('login success');
+                        })
+                      }else{
+                        var item = {}
+                        item['id'] = jsonObj.id
+                        item['name'] =`${jsonObj.extensionNumber} - ${fullName}`
+                        thisUser.extensionList.push(item)
                         callback(null, extensionId)
                         res.send('login success');
-                      })
-
+                      }
                     })
                     .catch(function(e) {
                       console.log("Failed")
@@ -137,9 +143,6 @@ var engine = User.prototype = {
     },
     getAccountExtensions: function (uri, callback){
       var endpoint = '/account/~/extension'
-      if (this.isAdmin == false)
-        endpoint = '/account/~/extension/~/extension'
-
       var params = {
           status: "Enabled",
           type: "User",
@@ -157,6 +160,7 @@ var engine = User.prototype = {
           p.get(endpoint, params)
             .then(function(resp){
               var jsonObj = resp.json()
+              console.log(jsonObj)
               var extensionList = []
               for (var record of jsonObj.records){
                 var item = {}
@@ -222,10 +226,12 @@ var engine = User.prototype = {
       this.csvContent = ""
       this.attachmentUrls = []
 
-      var jsonFile = `${thisUser.savedPath}${this.getExtensionId()}.json`
+      // delete old .csv file
+      var jsonFile = `${thisUser.savedPath}${this.getExtensionId()}.csv`
       if (fs.existsSync(jsonFile))
         fs.unlinkSync(jsonFile)
 
+      // empty /recordings folder
       var subfolder = `${thisUser.savedPath}recordings`
       if (fs.existsSync(subfolder)) {
         fs.readdirSync(subfolder).forEach((file, index) => {
@@ -233,6 +239,7 @@ var engine = User.prototype = {
           fs.unlinkSync(curPath);
         });
       }
+      // empty /voicemail folder
       subfolder = `${thisUser.savedPath}voicemail`
       if (fs.existsSync(subfolder)) {
         fs.readdirSync(subfolder).forEach((file, index) => {
@@ -240,6 +247,7 @@ var engine = User.prototype = {
           fs.unlinkSync(curPath);
         });
       }
+      /*
       subfolder = `${thisUser.savedPath}faxes`
       if (fs.existsSync(subfolder)) {
         fs.readdirSync(subfolder).forEach((file, index) => {
@@ -247,6 +255,8 @@ var engine = User.prototype = {
           fs.unlinkSync(curPath);
         });
       }
+      */
+      // delete old .zip file
       var zipFile = "CallLog_"+this.getExtensionId() + ".zip"
       if (fs.existsSync(zipFile))
         fs.unlinkSync(zipFile)
@@ -270,11 +280,12 @@ var engine = User.prototype = {
                   thisUser.readCallLogNextPage(navigationObj.nextPage.uri)
                 }else{
                   //thisUser.downloadAttachements(p)
-
                   var fullFilePath = `${thisUser.savedPath}${thisUser.getExtensionId()}.csv`
+                  /*
                   if(fs.existsSync(fullFilePath)){
                     fs.unlinkSync(fullFilePath)
                   }
+                  */
                   fs.writeFile(fullFilePath, thisUser.csvContent, function(err) {
                     if(err)
                       console.log(err);
@@ -344,9 +355,11 @@ var engine = User.prototype = {
                 //thisUser.downloadAttachements(p)
 
                 var fullFilePath = `${thisUser.savedPath}${thisUser.getExtensionId()}.csv`
+                /*
                 if(fs.existsSync(fullFilePath)){
                   fs.unlinkSync(fullFilePath)
                 }
+                */
                 fs.writeFile(fullFilePath, thisUser.csvContent, function(err) {
                   if(err)
                     console.log(err);
@@ -424,33 +437,15 @@ var engine = User.prototype = {
               thisUser.saveBinaryFile(p, "voicemail", fileName, voicemailUri)
             }else if (record.message.type == "Fax" && thisUser.downloadAttachements){
               if (record.direction == "Outbound" && record.result == "Sent"){
-                console.log("++++++")
+                console.log("++++++ Fax Record with Attachments ++++++")
+                /*
                 console.log(JSON.stringify(record))
                 console.log("++++++")
                 var messageUri = record.message.uri
                 //thisUser.readReport.attachmentCount++
                 thisUser.attachmentUrls.push(messageUri)
+                */
               }
-              /*
-              var messageUri = record.message.uri
-              p.get(messageUri)
-                .then(function (resp) {
-                  var jsonObj = resp.json()
-                  async.each(jsonObj.attachments,
-                    function(attachment, callback){
-                      // check message avail
-                      //if (record.message.id == "1070752210016" || record.message.id == "1070816817016"){
-                        console.log("======")
-                        console.log(JSON.stringify(attachment))
-                        console.log("======")
-                      //}
-
-                    })
-                })
-                .catch(function(e){
-                  console.log(e)
-                })
-              */
             }
           }else if (record.hasOwnProperty("recording") && thisUser.downloadRecording){
             // download binary content to local file
@@ -537,112 +532,108 @@ var engine = User.prototype = {
       if (this.csvContent == "")
         this.csvContent = '"Type","Direction","From","To","Extension","Forwarded To","Name","Date","Time","Action","Action Result","Result Description","Duration","Included","Purchased","Attachment"'
 
-        //console.log(JSON.stringify(record))
-        //console.log("====")
-        //var extensionNum = (record.to.hasOwnProperty("extensionNumber")) ? record.to.extensionNumber : ""
-        //extensionNum = (record.to.hasOwnProperty("name")) ? `${extensionNum} - ${record.to.name}` : extensionNum
-        for (var item of record.legs){
-          if (item.hasOwnProperty('master'))
-            this.csvContent += "\r\n" + item.type
-          else
-            this.csvContent += "\r\n"
-          if (item.direction == "Outbound"){
-            this.csvContent += ",Outgoing"
-            // from
-            if (item.hasOwnProperty('from')){
-              var temp = (item.from.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.from.phoneNumber) : ""
-              if (temp == "")
-                temp = (item.from.hasOwnProperty('extensionNumber')) ? item.from.extensionNumber : ""
-              this.csvContent += "," +  temp
-            }else{
-              this.csvContent += ","
-            }
-            // to
-            if (item.hasOwnProperty('to')){
-              var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
-              if (temp == "")
-                temp = (item.to.hasOwnProperty('extensionNumber')) ? item.to.extensionNumber : ""
-              this.csvContent += "," +  temp
-            }else{
-              this.csvContent += ","
-            }
-          }else{
-            this.csvContent += ",Incoming"
-            // from
-            if (item.hasOwnProperty('from')){
-              var temp = (item.from.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.from.phoneNumber) : ""
-              if (temp == "")
-                temp = (item.from.hasOwnProperty('extensionNumber')) ? item.from.extensionNumber : ""
-              this.csvContent += "," +  temp
-            }else{
-              this.csvContent += ","
-            }
-            // to
-            if (item.hasOwnProperty('to')){
-              var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
-              if (temp == "")
-                temp = (item.to.hasOwnProperty('extensionNumber')) ? item.to.extensionNumber : ""
-              this.csvContent += "," +  temp
-            }else{
-              this.csvContent += ","
-            }
-          }
-
-          // extension
-          if (item.hasOwnProperty('extension')){
-            var extObj = this.extensionList.find(o => o.id === item.extension.id)
-            if (extObj)
-              this.csvContent += "," + extObj.name
-            else
-              this.csvContent += ","
+      for (var item of record.legs){
+        if (item.hasOwnProperty('master'))
+          this.csvContent += "\r\n" + item.type
+        else
+          this.csvContent += "\r\n"
+        if (item.direction == "Outbound"){
+          this.csvContent += ",Outgoing"
+          // from
+          if (item.hasOwnProperty('from')){
+            var temp = (item.from.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.from.phoneNumber) : ""
+            if (temp == "")
+              temp = (item.from.hasOwnProperty('extensionNumber')) ? item.from.extensionNumber : ""
+            this.csvContent += "," +  temp
           }else{
             this.csvContent += ","
           }
-
-          // Forwarded to
-          if (record.direction == "Inbound" && item.direction == "Outbound"){
+          // to
+          if (item.hasOwnProperty('to')){
             var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
-            this.csvContent += "," + temp
-          }else
+            if (temp == "")
+              temp = (item.to.hasOwnProperty('extensionNumber')) ? item.to.extensionNumber : ""
+            this.csvContent += "," +  temp
+          }else{
             this.csvContent += ","
-
-          // Name
-          if (item.direction == "Outbound"){
-            var temp = ""
-            if (item.hasOwnProperty('to')){
-              var temp = (item.to.hasOwnProperty('name')) ? item.to.name : ""
-            }
-            this.csvContent += "," + temp
-          }else{
-            var temp = ""
-            if (item.hasOwnProperty('from')){
-              temp = (item.from.hasOwnProperty('name')) ? item.from.name : ""
-            }
-            this.csvContent += "," + temp
           }
-
-          let dateOptions = { weekday: 'short' }
-          let timeOptions = { hour: '2-digit',minute: '2-digit' }
-          var date = new Date(item.startTime)
-          var dateStr = date.toLocaleDateString("en-US", dateOptions)
-          dateStr += " " + date.toLocaleDateString("en-US")
-          this.csvContent += "," + dateStr
-          this.csvContent += "," + date.toLocaleTimeString("en-US")
-          this.csvContent += "," + item.action + "," + item.result
-          var desc = (item.hasOwnProperty('reasonDescription')) ? item.reasonDescription : ""
-          this.csvContent += "," + desc
-          this.csvContent += "," + formatDurationTime(item.duration)
-
-          if (record.direction == item.direction){
-            // included
-            this.csvContent += "," + record.billing.costIncluded
-            // purchased
-            this.csvContent += "," + record.billing.costPurchased
+        }else{
+          this.csvContent += ",Incoming"
+          // from
+          if (item.hasOwnProperty('from')){
+            var temp = (item.from.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.from.phoneNumber) : ""
+            if (temp == "")
+              temp = (item.from.hasOwnProperty('extensionNumber')) ? item.from.extensionNumber : ""
+            this.csvContent += "," +  temp
           }else{
-            this.csvContent += ",-,-"
+            this.csvContent += ","
           }
-          this.csvContent += "," + attachment
+          // to
+          if (item.hasOwnProperty('to')){
+            var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
+            if (temp == "")
+              temp = (item.to.hasOwnProperty('extensionNumber')) ? item.to.extensionNumber : ""
+            this.csvContent += "," +  temp
+          }else{
+            this.csvContent += ","
+          }
         }
+
+        // extension
+        if (item.hasOwnProperty('extension')){
+          var extObj = this.extensionList.find(o => o.id === item.extension.id)
+          if (extObj)
+            this.csvContent += "," + extObj.name
+          else
+            this.csvContent += ","
+        }else{
+          this.csvContent += ","
+        }
+
+        // Forwarded to
+        if (record.direction == "Inbound" && item.direction == "Outbound"){
+          var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
+          this.csvContent += "," + temp
+        }else
+          this.csvContent += ","
+
+        // Name
+        if (item.direction == "Outbound"){
+          var temp = ""
+          if (item.hasOwnProperty('to')){
+            var temp = (item.to.hasOwnProperty('name')) ? item.to.name : ""
+          }
+          this.csvContent += "," + temp
+        }else{
+          var temp = ""
+          if (item.hasOwnProperty('from')){
+            temp = (item.from.hasOwnProperty('name')) ? item.from.name : ""
+          }
+          this.csvContent += "," + temp
+        }
+
+        let dateOptions = { weekday: 'short' }
+        let timeOptions = { hour: '2-digit',minute: '2-digit' }
+        var date = new Date(item.startTime)
+        var dateStr = date.toLocaleDateString("en-US", dateOptions)
+        dateStr += " " + date.toLocaleDateString("en-US")
+        this.csvContent += "," + dateStr
+        this.csvContent += "," + date.toLocaleTimeString("en-US")
+        this.csvContent += "," + item.action + "," + item.result
+        var desc = (item.hasOwnProperty('reasonDescription')) ? item.reasonDescription : ""
+        this.csvContent += "," + desc
+        this.csvContent += "," + formatDurationTime(item.duration)
+
+        if (record.direction == item.direction){
+          // included
+          this.csvContent += "," + record.billing.costIncluded
+          // purchased
+          this.csvContent += "," + record.billing.costPurchased
+        }else{
+          this.csvContent += ",-,-"
+        }
+        this.csvContent += "," + attachment
+      }
     },
     saveBinaryFile: function(p, type, fileName, contentUri){
       console.log("saveBinaryFile")

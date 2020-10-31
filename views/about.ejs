@@ -35,9 +35,24 @@
               <li>Login with RingCentral account</li>
               <li>Select the "from" and "to" Date</li>
               <li>Select the "Simple" or "Detailed"</li>
+              <li>Select the "Recorded Calls" and/or "Voicemail" to include any binary file</li>
               <li>Click the <b>Read Call Log</b> button</li>
-              <li>Wait until the "Download Call Log (JSON)" displayed. Click the link to download the .zip file</li>
+              <li>Wait until the "Download Call Log (.zip)" displayed. Click the link to download the .zip file</li>
           </ol>
+          <div>
+            <p>The zip file name should look like this "CallLog_[extensionId].zip"</p>
+            <p>
+            The folder structure should look like this:<br/>
+            &nbsp;&nbsp;/CallLog_[extensionId]<br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;/voicemail<br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[contentId].mp3<br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[contentId].mp3<br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;/recordings<br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[contentId].mp3<br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[contentId].mp3<br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;[extensionId].csv<br/>
+            </p>
+          </div>
           <div>
             Get the project's source code from <a href="https://github.com/PacoVu/ringcentral-call-log">Github repo</a>
           </div>

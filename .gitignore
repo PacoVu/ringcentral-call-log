@@ -11,3 +11,4 @@ downloads/
 .npm
 .env
 *.zip
+*-token.js
