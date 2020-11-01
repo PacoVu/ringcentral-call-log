@@ -30,6 +30,7 @@ function User(id, mode) {
   this.voicemailUrls = []
   this.attachmentUrls = []
   this.savedPath = ""
+  this.lastReadDateRange = ""
   this.viewMode = "Simple"
   this.attachments = []
   this.downloadRecording = false
@@ -160,7 +161,7 @@ var engine = User.prototype = {
           p.get(endpoint, params)
             .then(function(resp){
               var jsonObj = resp.json()
-              console.log(jsonObj)
+              //console.log(jsonObj)
               var extensionList = []
               for (var record of jsonObj.records){
                 var item = {}
@@ -216,6 +217,7 @@ var engine = User.prototype = {
         showBlocked: true,
         perPage: 1000
       }
+
       // return and poll for result
       this.readReport.readInProgress = true
       this.downloadBinaryInProgress = false
@@ -227,7 +229,7 @@ var engine = User.prototype = {
       this.attachmentUrls = []
 
       // delete old .csv file
-      var jsonFile = `${thisUser.savedPath}${this.getExtensionId()}.csv`
+      var jsonFile = `${thisUser.savedPath}${this.lastReadDateRange}_${this.getExtensionId()}.csv`
       if (fs.existsSync(jsonFile))
         fs.unlinkSync(jsonFile)
 
@@ -257,10 +259,13 @@ var engine = User.prototype = {
       }
       */
       // delete old .zip file
-      var zipFile = "CallLog_"+this.getExtensionId() + ".zip"
+      var zipFile = `CallLog_${this.lastReadDateRange}_${this.getExtensionId()}.zip`
       if (fs.existsSync(zipFile))
         fs.unlinkSync(zipFile)
       res.send('{"status":"ok"}')
+
+      this.lastReadDateRange = `${req.body.dateFrom.split("T")[0]}_${req.body.dateTo.split("T")[0]}`
+      console.log(this.lastReadDateRange)
 
       this.rc_platform.getPlatform(function(err, p){
         if (p != null){
@@ -280,7 +285,7 @@ var engine = User.prototype = {
                   thisUser.readCallLogNextPage(navigationObj.nextPage.uri)
                 }else{
                   //thisUser.downloadAttachements(p)
-                  var fullFilePath = `${thisUser.savedPath}${thisUser.getExtensionId()}.csv`
+                  var fullFilePath = `${thisUser.savedPath}${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.csv`
                   /*
                   if(fs.existsSync(fullFilePath)){
                     fs.unlinkSync(fullFilePath)
@@ -354,7 +359,7 @@ var engine = User.prototype = {
               }else{
                 //thisUser.downloadAttachements(p)
 
-                var fullFilePath = `${thisUser.savedPath}${thisUser.getExtensionId()}.csv`
+                var fullFilePath = `${thisUser.savedPath}${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.csv`
                 /*
                 if(fs.existsSync(fullFilePath)){
                   fs.unlinkSync(fullFilePath)
@@ -644,7 +649,6 @@ var engine = User.prototype = {
       var thisUser = this
       var uri = p.createUrl(contentUri, {addToken: true});
       var fullNamePath = dir + fileName
-      console.log(fullNamePath)
       this.download(uri, fullNamePath, function(){
         thisUser.readReport.downloadCount++
         if (thisUser.readReport.downloadCount == thisUser.readReport.attachmentCount){
@@ -665,7 +669,7 @@ var engine = User.prototype = {
     },
     downloadCallLog: function(req, res){
       if (req.query.format == "CSV"){
-        var zipFile = "CallLog_"+this.getExtensionId() + ".zip"
+        var zipFile = `CallLog_${this.lastReadDateRange}_${this.getExtensionId()}.zip`
         zipper.sync.zip("./"+this.savedPath).compress().save(zipFile);
 
         var link = "/downloads?filename=" + zipFile
