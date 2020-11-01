@@ -104,14 +104,25 @@ function disableInputs(flag){
   }
 }
 
+function deleteCallLogZipFileCallLog(){
+  var url = "deletecalllog"
+  var getting = $.get( url );
+  getting.done(function( res ) {
+    if (res.status == "ok"){
+      $("#delete_csv").css('display', 'none');
+    }else
+      alert(res.message)
+  });
+}
 
 function downloadCallLog(format){
   var url = "downloadcalllog?format="+format
   var getting = $.get( url );
   getting.done(function( res ) {
-    if (res.status == "ok")
+    if (res.status == "ok"){
       window.location.href = res.message
-    else
+      $("#delete_csv").css('display', 'block');
+    }else
       alert(res.message)
   });
 }

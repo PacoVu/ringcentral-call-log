@@ -88,6 +88,10 @@ app.get('/downloadcalllog', function (req, res) {
   router.downloadCallLog(req, res)
 })
 
+app.get('/deletecalllog', function (req, res) {
+  router.deleteCallLogZipFile(req, res)
+})
+
 app.get('/downloads', function(req, res){
   console.log(req.query)
   var file = req.query.filename;

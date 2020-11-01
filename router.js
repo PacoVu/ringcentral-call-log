@@ -105,6 +105,12 @@ var router = module.exports = {
       return this.forceLogin(req, res)
     users[index].downloadCallLog(req, res)
   },
+  deleteCallLogZipFile: function(req, res){
+    var index = getUserIndex(req.session.userId)
+    if (index < 0)
+      return this.forceLogin(req, res)
+    users[index].deleteCallLogZipFile(res)
+  },
   postFeedbackToGlip: function(req, res){
     var index = getUserIndex(req.session.userId)
     if (index < 0)

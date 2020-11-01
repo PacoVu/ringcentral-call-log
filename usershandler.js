@@ -750,6 +750,13 @@ var engine = User.prototype = {
         }
       }
     },
+    deleteCallLogZipFile: function(res){
+      var zipFile = `CallLog_${this.lastReadDateRange}_${this.getExtensionId()}.zip`
+      if(fs.existsSync(zipFile)){
+        fs.unlinkSync(zipFile)
+      }
+      res.send({"status":"ok","message":"file deleted"})
+    },
     downloadAttachements: function(platform){
       var thisUser = this
       var dir = this.savedPath + "recordings/"
