@@ -164,11 +164,16 @@ var engine = User.prototype = {
               //console.log(jsonObj)
               var extensionList = []
               for (var record of jsonObj.records){
-                var item = {}
-                item['id'] = record.id
-                //item['extNum'] = record.extensionNumber.toString() + " - "
-                item['name'] =`${record.extensionNumber} - ${record.contact.firstName} ${record.contact.lastName}`
-                //console.log(item.fullName)
+                var site = {}
+                if (record.hasOwnProperty('site'))
+                  site = record.site
+                var item = {
+                  id: record.id,
+                  name: `${record.extensionNumber} - ${record.contact.firstName} ${record.contact.lastName}`,
+                  site: site
+                }
+                //item['id'] = record.id,
+                //item['name'] =`${record.extensionNumber} - ${record.contact.firstName} ${record.contact.lastName}`
                 thisUser.extensionList.push(item)
               }
               if (jsonObj.navigation.hasOwnProperty("nextPage"))
@@ -431,7 +436,7 @@ var engine = User.prototype = {
       async.each(records,
         function(record, callback){
           //thisUser.callRecords.push(record)
-          var attachment = ""
+          var attachment = "-"
           if (record.hasOwnProperty("message")){
             if (record.message.type == "VoiceMail" && thisUser.downloadVoicemail){
               var voicemailUri = record.message.uri.replace("platform", "media")
@@ -535,7 +540,7 @@ var engine = User.prototype = {
     },
     detailedCSVFormat: function(record, attachment){
       if (this.csvContent == "")
-        this.csvContent = '"Type","Direction","From","To","Extension","Forwarded To","Name","Date","Time","Action","Action Result","Result Description","Duration","Included","Purchased","Attachment"'
+        this.csvContent = '"Type","Direction","From","To","Extension","Forwarded To","Name","Date","Time","Action","Action Result","Result Description","Duration","Included","Purchased","Site","Attachment"'
 
       for (var item of record.legs){
         if (item.hasOwnProperty('master'))
@@ -585,12 +590,15 @@ var engine = User.prototype = {
         }
 
         // extension
+        var site = "-"
         if (item.hasOwnProperty('extension')){
           var extObj = this.extensionList.find(o => o.id === item.extension.id)
-          if (extObj)
+          if (extObj){
             this.csvContent += "," + extObj.name
-          else
+            site = `${extObj.site.name} - ${extObj.site.code}`
+          }else{
             this.csvContent += ","
+          }
         }else{
           this.csvContent += ","
         }
@@ -637,6 +645,7 @@ var engine = User.prototype = {
         }else{
           this.csvContent += ",-,-"
         }
+        this.csvContent += "," + site
         this.csvContent += "," + attachment
       }
     },
