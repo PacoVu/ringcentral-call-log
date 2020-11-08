@@ -679,6 +679,7 @@ var engine = User.prototype = {
           if (item.direction == "Outbound"){
             legs += ",Outgoing"
             // from
+            /*
             if (item.hasOwnProperty('from')){
               var temp = (item.from.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.from.phoneNumber) : ""
               if (temp == "")
@@ -687,6 +688,8 @@ var engine = User.prototype = {
             }else{
               legs += ","
             }
+            */
+            legs += ","
             // to
             /*
             if (item.hasOwnProperty('to')){
