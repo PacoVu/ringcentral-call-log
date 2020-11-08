@@ -1,14 +1,5 @@
-//var canPoll = false
+var timeOffset = 0
 function init(){
-  /*
-  var jsonObj = JSON.parse(window.sendReport)
-  if (jsonObj.sendInProgress){
-    $("#progress").toggleClass("show")
-    $("#control_panel").css('display', 'block');
-    disableInputs(true)
-    pollResult()
-  }
-  */
   $( "#fromdatepicker" ).datepicker({ dateFormat: "yy-mm-dd"});
   $( "#todatepicker" ).datepicker({dateFormat: "yy-mm-dd"});
   var pastMonth = new Date();
@@ -21,15 +12,11 @@ function init(){
   }
   $( "#fromdatepicker" ).datepicker('setDate', new Date(year, month, day));
   $( "#todatepicker" ).datepicker('setDate', new Date());
+
+  timeOffset = new Date().getTimezoneOffset()*60000;
 }
 
 function readCallLogs(){
-  //disableInputs(true)
-  /*
-  $("#fromdatepicker").prop("disabled", true);
-  $("#todatepicker").prop("disabled", true);
-  $("#readcalllogs").prop("disabled", true);
-  */
   var configs = {}
   configs['dateFrom'] = $("#fromdatepicker").val() + "T00:00:00.001Z"
   var gmtTime = $("#todatepicker").val()
@@ -43,6 +30,7 @@ function readCallLogs(){
   }
   configs['view'] = $("#view").val()
   configs['attachments'] = JSON.stringify($('#attachments').val());
+  configs['timeOffset'] = timeOffset
   //return alert (JSON.stringify(configs))
   var url = "readlogs"
   var posting = $.post( url, configs );

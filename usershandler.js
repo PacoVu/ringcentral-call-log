@@ -31,6 +31,7 @@ function User(id, mode) {
   this.attachmentUrls = []
   this.savedPath = ""
   this.lastReadDateRange = ""
+  this.timeOffset = 0
   this.viewMode = "Simple"
   this.attachments = []
   this.downloadRecording = false
@@ -202,6 +203,8 @@ var engine = User.prototype = {
       var thisRes = res
       var thisUser = this
       this.viewMode = req.body.view
+      this.timeOffset = parseInt(req.body.timeOffset)
+      console.log(this.timeOffset)
       var attachments = JSON.parse(req.body.attachments)
       this.downloadRecording = false
       this.downloadVoicemail = false
@@ -533,10 +536,12 @@ var engine = User.prototype = {
       let dateOptions = { weekday: 'short' }
       let timeOptions = { hour: '2-digit',minute: '2-digit' }
       var date = new Date(record.startTime)
+      var timestamp = date.getTime() - this.timeOffset
+      date = new Date (timestamp)
       var dateStr = date.toLocaleDateString("en-US", dateOptions)
       dateStr += " " + date.toLocaleDateString("en-US")
       this.csvContent += "," + dateStr
-      this.csvContent += "," + date.toLocaleTimeString("en-US")
+      this.csvContent += "," + date.toLocaleTimeString("en-US", {timeZone: 'UTC'})
       this.csvContent += "," + record.action + "," + record.result
       var desc = (record.hasOwnProperty('reasonDescription')) ? record.reasonDescription : ""
       this.csvContent += "," + desc
@@ -642,10 +647,14 @@ var engine = User.prototype = {
           let dateOptions = { weekday: 'short' }
           let timeOptions = { hour: '2-digit',minute: '2-digit' }
           var date = new Date(item.startTime)
+          var timestamp = date.getTime() - this.timeOffset
+          date = new Date (timestamp)
           var dateStr = date.toLocaleDateString("en-US", dateOptions)
           dateStr += " " + date.toLocaleDateString("en-US")
           this.csvContent += "," + dateStr
-          this.csvContent += "," + date.toLocaleTimeString("en-US")
+          this.csvContent += "," + date.toLocaleTimeString("en-US", {timeZone: 'UTC'}) // , {timeZone: 'America/Los_Angeles'}
+          //console.log(date.toLocaleTimeString("en-US"))
+          //console.log(date.toLocaleTimeString("en-US", {timeZone: 'UTC'}))
           this.csvContent += "," + item.action + "," + item.result
           var desc = (item.hasOwnProperty('reasonDescription')) ? item.reasonDescription : ""
           this.csvContent += "," + desc
@@ -756,8 +765,10 @@ var engine = User.prototype = {
           let dateOptions = { weekday: 'short' }
           let timeOptions = { hour: '2-digit',minute: '2-digit' }
           var date = new Date(item.startTime)
+          var timestamp = date.getTime() - this.timeOffset
+          date = new Date (timestamp)
           var dateStr = date.toLocaleDateString("en-US", dateOptions)
-          dateStr += " " + date.toLocaleDateString("en-US")
+          dateStr += " " + date.toLocaleDateString("en-US", {timeZone: 'UTC'})
           legs += "," + dateStr
           legs += "," + date.toLocaleTimeString("en-US")
           legs += "," + item.action + "," + item.result
