@@ -714,6 +714,7 @@ var engine = User.prototype = {
               legs += ","
             }
             // to
+            /*
             if (item.hasOwnProperty('to')){
               var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
               if (temp == "")
@@ -722,6 +723,8 @@ var engine = User.prototype = {
             }else{
               legs += ","
             }
+            */
+            legs += ","
           }
 
           // extension
