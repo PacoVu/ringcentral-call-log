@@ -234,9 +234,14 @@ var engine = User.prototype = {
       this.attachmentUrls = []
 
       // delete old .csv file
-      var jsonFile = `${thisUser.savedPath}${this.lastReadDateRange}_${this.getExtensionId()}.csv`
-      if (fs.existsSync(jsonFile))
-        fs.unlinkSync(jsonFile)
+      if (fs.existsSync(this.savedPath)) {
+        fs.readdirSync(this.savedPath).forEach((file, index) => {
+          if (file.indexOf(".csv") > 0){
+            const fileName = Path.join(this.savedPath, file);
+            fs.unlinkSync(fileName);
+          }
+        });
+      }
 
       // empty /recordings folder
       var subfolder = `${thisUser.savedPath}recordings`
@@ -539,14 +544,370 @@ var engine = User.prototype = {
       this.csvContent += "," + attachment
     },
     detailedCSVFormat: function(record, attachment){
+      //console.log(JSON.stringify(record))
       if (this.csvContent == "")
-        this.csvContent = '"Type","Direction","From","To","Extension","Forwarded To","Name","Date","Time","Action","Action Result","Result Description","Duration","Included","Purchased","Site","Attachment"'
-
+        this.csvContent = '"Type","CallId","SessionId","Leg","Direction","From","To","Extension","Forwarded To","Name","Date","Time","Action","Action Result","Result Description","Duration","Included","Purchased","Site","Attachment"'
+      var i = 1
+      var legs = ""
+      var masterSite = "-"
       for (var item of record.legs){
-        if (item.hasOwnProperty('master'))
+        if (item.hasOwnProperty('master')){
           this.csvContent += "\r\n" + item.type
-        else
+          this.csvContent += "," + record.id
+          this.csvContent += `,${record.sessionId.toString()}`
+          this.csvContent += `,Leg-master`
+          if (item.direction == "Outbound"){
+            this.csvContent += ",Outgoing"
+            // from
+            if (item.hasOwnProperty('from')){
+              var temp = (item.from.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.from.phoneNumber) : ""
+              if (temp == "")
+                temp = (item.from.hasOwnProperty('extensionNumber')) ? item.from.extensionNumber : ""
+              this.csvContent += "," +  temp
+            }else{
+              this.csvContent += ","
+            }
+            // to
+            if (item.hasOwnProperty('to')){
+              var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
+              if (temp == "")
+                temp = (item.to.hasOwnProperty('extensionNumber')) ? item.to.extensionNumber : ""
+              this.csvContent += "," +  temp
+            }else{
+              this.csvContent += ","
+            }
+          }else{
+            this.csvContent += ",Incoming"
+            // from
+            if (item.hasOwnProperty('from')){
+              var temp = (item.from.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.from.phoneNumber) : ""
+              if (temp == "")
+                temp = (item.from.hasOwnProperty('extensionNumber')) ? item.from.extensionNumber : ""
+              this.csvContent += "," +  temp
+            }else{
+              this.csvContent += ","
+            }
+            // to
+            if (item.hasOwnProperty('to')){
+              var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
+              if (temp == "")
+                temp = (item.to.hasOwnProperty('extensionNumber')) ? item.to.extensionNumber : ""
+              this.csvContent += "," +  temp
+            }else{
+              this.csvContent += ","
+            }
+          }
+
+          // extension
+          if (item.hasOwnProperty('extension')){
+            var extObj = this.extensionList.find(o => o.id === item.extension.id)
+            if (extObj){
+              //console.log(extObj.name)
+              this.csvContent += "," + extObj.name
+              //console.log(extObj.site)
+              if (extObj.hasOwnProperty('site')){
+                //site = (extObj.site.hasOwnProperty('name')) ? extObj.site.name : ""
+                //site +=  " - " + extObj.site.code
+                masterSite = `${extObj.site.name} - ${extObj.site.code}`
+              }
+            }else{
+              this.csvContent += ","
+            }
+          }else{
+            this.csvContent += ","
+          }
+
+          // Forwarded to
+          if (record.direction == "Inbound" && item.direction == "Outbound"){
+            var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
+            this.csvContent += "," + temp
+          }else
+            this.csvContent += ","
+
+          // Name
+          if (item.direction == "Outbound"){
+            var temp = ""
+            if (item.hasOwnProperty('to')){
+              var temp = (item.to.hasOwnProperty('name')) ? item.to.name : ""
+            }
+            this.csvContent += `,"${temp}"`
+          }else{
+            var temp = ""
+            if (item.hasOwnProperty('from')){
+              temp = (item.from.hasOwnProperty('name')) ? item.from.name : ""
+            }
+            this.csvContent += `,"${temp}"`
+          }
+
+          let dateOptions = { weekday: 'short' }
+          let timeOptions = { hour: '2-digit',minute: '2-digit' }
+          var date = new Date(item.startTime)
+          var dateStr = date.toLocaleDateString("en-US", dateOptions)
+          dateStr += " " + date.toLocaleDateString("en-US")
+          this.csvContent += "," + dateStr
+          this.csvContent += "," + date.toLocaleTimeString("en-US")
+          this.csvContent += "," + item.action + "," + item.result
+          var desc = (item.hasOwnProperty('reasonDescription')) ? item.reasonDescription : ""
+          this.csvContent += "," + desc
+          this.csvContent += "," + formatDurationTime(item.duration)
+
+          // included
+          this.csvContent += "," + record.billing.costIncluded
+          // purchased
+          this.csvContent += "," + record.billing.costPurchased
+          /*
+          if (masterSite != "-"){
+            this.csvContent += "," + masterSite
+            this.csvContent += "," + attachment
+          }
+          */
+        }else{
+          legs += "\r\n"
+          legs += ","
+          legs += ","
+          legs += `,Leg-${i}`
+          i++
+          if (item.direction == "Outbound"){
+            legs += ",Outgoing"
+            // from
+            if (item.hasOwnProperty('from')){
+              var temp = (item.from.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.from.phoneNumber) : ""
+              if (temp == "")
+                temp = (item.from.hasOwnProperty('extensionNumber')) ? item.from.extensionNumber : ""
+              legs += "," +  temp
+            }else{
+              legs += ","
+            }
+            // to
+            if (item.hasOwnProperty('to')){
+              var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
+              if (temp == "")
+                temp = (item.to.hasOwnProperty('extensionNumber')) ? item.to.extensionNumber : ""
+              legs += "," +  temp
+            }else{
+              legs += ","
+            }
+          }else{
+            legs += ",Incoming"
+            // from
+            if (item.hasOwnProperty('from')){
+              var temp = (item.from.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.from.phoneNumber) : ""
+              if (temp == "")
+                temp = (item.from.hasOwnProperty('extensionNumber')) ? item.from.extensionNumber : ""
+              legs += "," +  temp
+            }else{
+              legs += ","
+            }
+            // to
+            if (item.hasOwnProperty('to')){
+              var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
+              if (temp == "")
+                temp = (item.to.hasOwnProperty('extensionNumber')) ? item.to.extensionNumber : ""
+              legs += "," +  temp
+            }else{
+              legs += ","
+            }
+          }
+
+          // extension
+          var site = "-"
+          if (item.hasOwnProperty('extension')){
+            var extObj = this.extensionList.find(o => o.id === item.extension.id)
+            if (extObj){
+              //console.log(extObj.name)
+              legs += "," + extObj.name
+              //console.log(extObj.site)
+              if (extObj.hasOwnProperty('site')){
+                //site = (extObj.site.hasOwnProperty('name')) ? extObj.site.name : ""
+                //site +=  " - " + extObj.site.code
+                site = `${extObj.site.name} - ${extObj.site.code}`
+                if (masterSite == "-")
+                  masterSite = site
+              }
+            }else{
+              legs += ","
+            }
+          }else{
+            legs += ","
+          }
+
+          // Forwarded to
+          if (record.direction == "Inbound" && item.direction == "Outbound"){
+            var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
+            legs += "," + temp
+          }else
+            legs += ","
+
+          // Name
+          if (item.direction == "Outbound"){
+            var temp = ""
+            if (item.hasOwnProperty('to')){
+              var temp = (item.to.hasOwnProperty('name')) ? item.to.name : ""
+            }
+            legs += `,"${temp}"`
+          }else{
+            var temp = ""
+            if (item.hasOwnProperty('from')){
+              temp = (item.from.hasOwnProperty('name')) ? item.from.name : ""
+            }
+            legs += `,"${temp}"`
+          }
+
+          let dateOptions = { weekday: 'short' }
+          let timeOptions = { hour: '2-digit',minute: '2-digit' }
+          var date = new Date(item.startTime)
+          var dateStr = date.toLocaleDateString("en-US", dateOptions)
+          dateStr += " " + date.toLocaleDateString("en-US")
+          legs += "," + dateStr
+          legs += "," + date.toLocaleTimeString("en-US")
+          legs += "," + item.action + "," + item.result
+          var desc = (item.hasOwnProperty('reasonDescription')) ? item.reasonDescription : ""
+          legs += "," + desc
+          legs += "," + formatDurationTime(item.duration)
+
+
+          // included and purchased
+          legs += ",0,0"
+          legs += "," + site
+          legs += ","
+        }
+      }
+
+      this.csvContent += "," + masterSite
+      this.csvContent += "," + attachment
+
+      this.csvContent += legs
+    },
+    parseLegData: function(item){
+      var row = ""
+      if (item.direction == "Outbound"){
+        this.csvContent += ",Outgoing"
+        // from
+        if (item.hasOwnProperty('from')){
+          var temp = (item.from.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.from.phoneNumber) : ""
+          if (temp == "")
+            temp = (item.from.hasOwnProperty('extensionNumber')) ? item.from.extensionNumber : ""
+          this.csvContent += "," +  temp
+        }else{
+          this.csvContent += ","
+        }
+        // to
+        if (item.hasOwnProperty('to')){
+          var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
+          if (temp == "")
+            temp = (item.to.hasOwnProperty('extensionNumber')) ? item.to.extensionNumber : ""
+          this.csvContent += "," +  temp
+        }else{
+          this.csvContent += ","
+        }
+      }else{
+        this.csvContent += ",Incoming"
+        // from
+        if (item.hasOwnProperty('from')){
+          var temp = (item.from.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.from.phoneNumber) : ""
+          if (temp == "")
+            temp = (item.from.hasOwnProperty('extensionNumber')) ? item.from.extensionNumber : ""
+          this.csvContent += "," +  temp
+        }else{
+          this.csvContent += ","
+        }
+        // to
+        if (item.hasOwnProperty('to')){
+          var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
+          if (temp == "")
+            temp = (item.to.hasOwnProperty('extensionNumber')) ? item.to.extensionNumber : ""
+          this.csvContent += "," +  temp
+        }else{
+          this.csvContent += ","
+        }
+      }
+
+      // extension
+      var site = "-"
+      if (item.hasOwnProperty('extension')){
+        var extObj = this.extensionList.find(o => o.id === item.extension.id)
+        if (extObj){
+          //console.log(extObj.name)
+          this.csvContent += "," + extObj.name
+          //console.log(extObj.site)
+          if (extObj.hasOwnProperty('site')){
+            //site = (extObj.site.hasOwnProperty('name')) ? extObj.site.name : ""
+            //site +=  " - " + extObj.site.code
+            site = `${extObj.site.name} - ${extObj.site.code}`
+          }
+        }else{
+          this.csvContent += ","
+        }
+      }else{
+        this.csvContent += ","
+      }
+
+      // Forwarded to
+      if (record.direction == "Inbound" && item.direction == "Outbound"){
+        var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
+        this.csvContent += "," + temp
+      }else
+        this.csvContent += ","
+
+      // Name
+      if (item.direction == "Outbound"){
+        var temp = ""
+        if (item.hasOwnProperty('to')){
+          var temp = (item.to.hasOwnProperty('name')) ? item.to.name : ""
+        }
+        this.csvContent += `,"${temp}"`
+      }else{
+        var temp = ""
+        if (item.hasOwnProperty('from')){
+          temp = (item.from.hasOwnProperty('name')) ? item.from.name : ""
+        }
+        this.csvContent += `,"${temp}"`
+      }
+
+      let dateOptions = { weekday: 'short' }
+      let timeOptions = { hour: '2-digit',minute: '2-digit' }
+      var date = new Date(item.startTime)
+      var dateStr = date.toLocaleDateString("en-US", dateOptions)
+      dateStr += " " + date.toLocaleDateString("en-US")
+      this.csvContent += "," + dateStr
+      this.csvContent += "," + date.toLocaleTimeString("en-US")
+      this.csvContent += "," + item.action + "," + item.result
+      var desc = (item.hasOwnProperty('reasonDescription')) ? item.reasonDescription : ""
+      this.csvContent += "," + desc
+      this.csvContent += "," + formatDurationTime(item.duration)
+
+      //if (record.direction == item.direction){
+      //if (item.hasOwnProperty('master')){
+      if (site != "-"){
+        // included
+        this.csvContent += "," + record.billing.costIncluded
+        // purchased
+        this.csvContent += "," + record.billing.costPurchased
+      }else{
+        this.csvContent += ",-,-"
+      }
+      this.csvContent += "," + site
+      this.csvContent += "," + attachment
+    },
+    detailedCSVFormat_old: function(record, attachment){
+      //console.log(JSON.stringify(record))
+      if (this.csvContent == "")
+        this.csvContent = '"Type","CallId","SessionId","Leg","Direction","From","To","Extension","Forwarded To","Name","Date","Time","Action","Action Result","Result Description","Duration","Included","Purchased","Site","Attachment"'
+      var i = 1
+      var legs = ""
+      for (var item of record.legs){
+        if (item.hasOwnProperty('master')){
+          this.csvContent += "\r\n" + item.type
+          this.csvContent += "," + record.id
+          this.csvContent += `,${record.sessionId.toString()}`
+          this.csvContent += `,Leg-master`
+        }else{
           this.csvContent += "\r\n"
+          this.csvContent += ","
+          this.csvContent += ","
+          this.csvContent += `,Leg-${i}`
+          i++
+        }
         if (item.direction == "Outbound"){
           this.csvContent += ",Outgoing"
           // from
@@ -594,8 +955,14 @@ var engine = User.prototype = {
         if (item.hasOwnProperty('extension')){
           var extObj = this.extensionList.find(o => o.id === item.extension.id)
           if (extObj){
+            //console.log(extObj.name)
             this.csvContent += "," + extObj.name
-            site = `${extObj.site.name} - ${extObj.site.code}`
+            //console.log(extObj.site)
+            if (extObj.hasOwnProperty('site')){
+              //site = (extObj.site.hasOwnProperty('name')) ? extObj.site.name : ""
+              //site +=  " - " + extObj.site.code
+              site = `${extObj.site.name} - ${extObj.site.code}`
+            }
           }else{
             this.csvContent += ","
           }
@@ -616,13 +983,13 @@ var engine = User.prototype = {
           if (item.hasOwnProperty('to')){
             var temp = (item.to.hasOwnProperty('name')) ? item.to.name : ""
           }
-          this.csvContent += "," + temp
+          this.csvContent += `,"${temp}"`
         }else{
           var temp = ""
           if (item.hasOwnProperty('from')){
             temp = (item.from.hasOwnProperty('name')) ? item.from.name : ""
           }
-          this.csvContent += "," + temp
+          this.csvContent += `,"${temp}"`
         }
 
         let dateOptions = { weekday: 'short' }
@@ -637,7 +1004,9 @@ var engine = User.prototype = {
         this.csvContent += "," + desc
         this.csvContent += "," + formatDurationTime(item.duration)
 
-        if (record.direction == item.direction){
+        //if (record.direction == item.direction){
+        //if (item.hasOwnProperty('master')){
+        if (site != "-"){
           // included
           this.csvContent += "," + record.billing.costIncluded
           // purchased
