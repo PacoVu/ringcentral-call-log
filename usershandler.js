@@ -535,8 +535,7 @@ var engine = User.prototype = {
           // Phone Number
           this.csvContent += ","
           // Name
-          temp = (record.from.hasOwnProperty('name')) ? record.from.name : ""
-          this.csvContent += `,"${temp}"`
+          this.csvContent += ","
         }
       }
       let dateOptions = { weekday: 'short' }
