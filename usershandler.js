@@ -555,51 +555,64 @@ var engine = User.prototype = {
       var i = 1
       var legs = ""
       var masterSite = "-"
+      var firstExtension = ""
       for (var item of record.legs){
         if (item.hasOwnProperty('master')){
-          this.csvContent += "\r\n" + item.type
-          this.csvContent += "," + record.id
-          this.csvContent += `,${record.sessionId.toString()}`
-          this.csvContent += `,Leg-master`
+          var master = {
+            Type: item.type,
+            CallId:record.id,
+            SessionId:record.sessionId,
+            Leg:"Leg-master",
+            Direction:"",
+            From:"",
+            To:"",
+            Extension:"",
+            Forwarded_To:"",
+            Name:"",
+            Date:"",
+            Time:"",
+            Action:"",
+            Action_Result:"",
+            Result_Description:"",
+            Duration:"",
+            Included:"",
+            Purchased:"",
+            Site:"",
+            Attachment:""
+          }
+
           if (item.direction == "Outbound"){
-            this.csvContent += ",Outgoing"
+            master.Direction = "Outgoing"
+
             // from
             if (item.hasOwnProperty('from')){
               var temp = (item.from.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.from.phoneNumber) : ""
               if (temp == "")
                 temp = (item.from.hasOwnProperty('extensionNumber')) ? item.from.extensionNumber : ""
-              this.csvContent += "," +  temp
-            }else{
-              this.csvContent += ","
+              master.From = temp
             }
             // to
             if (item.hasOwnProperty('to')){
               var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
               if (temp == "")
                 temp = (item.to.hasOwnProperty('extensionNumber')) ? item.to.extensionNumber : ""
-              this.csvContent += "," +  temp
-            }else{
-              this.csvContent += ","
+              master.To = temp
             }
           }else{
-            this.csvContent += ",Incoming"
+            master.Direction = "Incoming"
             // from
             if (item.hasOwnProperty('from')){
               var temp = (item.from.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.from.phoneNumber) : ""
               if (temp == "")
                 temp = (item.from.hasOwnProperty('extensionNumber')) ? item.from.extensionNumber : ""
-              this.csvContent += "," +  temp
-            }else{
-              this.csvContent += ","
+              master.From = temp
             }
             // to
             if (item.hasOwnProperty('to')){
               var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
               if (temp == "")
                 temp = (item.to.hasOwnProperty('extensionNumber')) ? item.to.extensionNumber : ""
-              this.csvContent += "," +  temp
-            }else{
-              this.csvContent += ","
+              master.To = temp
             }
           }
 
@@ -608,26 +621,21 @@ var engine = User.prototype = {
             var extObj = this.extensionList.find(o => o.id === item.extension.id)
             if (extObj){
               //console.log(extObj.name)
-              this.csvContent += "," + extObj.name
+              master.Extension = extObj.name
               //console.log(extObj.site)
               if (extObj.hasOwnProperty('site')){
                 //site = (extObj.site.hasOwnProperty('name')) ? extObj.site.name : ""
                 //site +=  " - " + extObj.site.code
-                masterSite = `${extObj.site.name} - ${extObj.site.code}`
+                master.Site = `${extObj.site.name} - ${extObj.site.code}`
               }
-            }else{
-              this.csvContent += ","
             }
-          }else{
-            this.csvContent += ","
           }
 
           // Forwarded to
           if (record.direction == "Inbound" && item.direction == "Outbound"){
             var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
-            this.csvContent += "," + temp
-          }else
-            this.csvContent += ","
+            master.Forwarded_To = temp
+          }
 
           // Name
           if (item.direction == "Outbound"){
@@ -635,13 +643,13 @@ var engine = User.prototype = {
             if (item.hasOwnProperty('to')){
               var temp = (item.to.hasOwnProperty('name')) ? item.to.name : ""
             }
-            this.csvContent += `,"${temp}"`
+            master.Name = temp
           }else{
             var temp = ""
             if (item.hasOwnProperty('from')){
               temp = (item.from.hasOwnProperty('name')) ? item.from.name : ""
             }
-            this.csvContent += `,"${temp}"`
+            master.Name = temp
           }
 
           let dateOptions = { weekday: 'short' }
@@ -651,25 +659,19 @@ var engine = User.prototype = {
           date = new Date (timestamp)
           var dateStr = date.toLocaleDateString("en-US", dateOptions)
           dateStr += " " + date.toLocaleDateString("en-US")
-          this.csvContent += "," + dateStr
-          this.csvContent += "," + date.toLocaleTimeString("en-US", {timeZone: 'UTC'}) // , {timeZone: 'America/Los_Angeles'}
-          //console.log(date.toLocaleTimeString("en-US"))
-          //console.log(date.toLocaleTimeString("en-US", {timeZone: 'UTC'}))
-          this.csvContent += "," + item.action + "," + item.result
+          master.Date = dateStr
+          master.Time = date.toLocaleTimeString("en-US", {timeZone: 'UTC'}) // , {timeZone: 'America/Los_Angeles'}
+
+          master.Action = item.action
+          master.Action_Result = item.result
           var desc = (item.hasOwnProperty('reasonDescription')) ? item.reasonDescription : ""
-          this.csvContent += "," + desc
-          this.csvContent += "," + formatDurationTime(item.duration)
+          master.Result_Description = desc
+          master.Duration = formatDurationTime(item.duration)
 
           // included
-          this.csvContent += "," + record.billing.costIncluded
+          master.Included = record.billing.costIncluded
           // purchased
-          this.csvContent += "," + record.billing.costPurchased
-          /*
-          if (masterSite != "-"){
-            this.csvContent += "," + masterSite
-            this.csvContent += "," + attachment
-          }
-          */
+          master.Purchased = record.billing.costPurchased
         }else{ // non master legs
           legs += "\r\n"
           legs += ","
@@ -732,9 +734,8 @@ var engine = User.prototype = {
           if (item.hasOwnProperty('extension')){
             var extObj = this.extensionList.find(o => o.id === item.extension.id)
             if (extObj){
-              //console.log(extObj.name)
+              firstExtension = (firstExtension == "") ? extObj.name : ""
               legs += "," + extObj.name
-              //console.log(extObj.site)
               if (extObj.hasOwnProperty('site')){
                 //site = (extObj.site.hasOwnProperty('name')) ? extObj.site.name : ""
                 //site +=  " - " + extObj.site.code
@@ -773,13 +774,14 @@ var engine = User.prototype = {
 
           let dateOptions = { weekday: 'short' }
           let timeOptions = { hour: '2-digit',minute: '2-digit' }
+
           var date = new Date(item.startTime)
           var timestamp = date.getTime() - this.timeOffset
           date = new Date (timestamp)
           var dateStr = date.toLocaleDateString("en-US", dateOptions)
-          dateStr += " " + date.toLocaleDateString("en-US", {timeZone: 'UTC'})
+          dateStr += " " + date.toLocaleDateString("en-US")
           legs += "," + dateStr
-          legs += "," + date.toLocaleTimeString("en-US")
+          legs += "," + date.toLocaleTimeString("en-US", {timeZone: 'UTC'})
           legs += "," + item.action + "," + item.result
           var desc = (item.hasOwnProperty('reasonDescription')) ? item.reasonDescription : ""
           legs += "," + desc
@@ -793,8 +795,26 @@ var engine = User.prototype = {
         }
       }
 
-      this.csvContent += "," + masterSite
-      this.csvContent += "," + attachment
+      this.csvContent += `\r\n${master.Type}`
+      this.csvContent += `,${master.CallId}`
+      this.csvContent += `,${master.SessionId}`
+      this.csvContent += `,${master.Leg}`
+      this.csvContent += `,${master.Direction}`
+      this.csvContent += `,${master.From}`
+      this.csvContent += `,${master.To}`
+      this.csvContent += `,${firstExtension}`
+      this.csvContent += `,${master.Forwarded_To}`
+      this.csvContent += `,${master.Name}`
+      this.csvContent += `,${master.Date}`
+      this.csvContent += `,${master.Time}`
+      this.csvContent += `,${master.Action}`
+      this.csvContent += `,${master.Action_Result}`
+      this.csvContent += `,${master.Result_Description}`
+      this.csvContent += `,${master.Duration}`
+      this.csvContent += `,${master.Included}`
+      this.csvContent += `,${master.Purchased}`
+      this.csvContent += `,${masterSite}`
+      this.csvContent += `,${attachment}`
 
       this.csvContent += legs
     },
