@@ -526,11 +526,17 @@ var engine = User.prototype = {
           var temp = (record.from.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(record.from.phoneNumber) : ""
           if (temp == "")
             temp = (record.from.hasOwnProperty('extensionNumber')) ? record.from.extensionNumber : ""
+          // Phone Number
           this.csvContent += "," +  temp
+          // Name
           temp = (record.from.hasOwnProperty('name')) ? record.from.name : ""
           this.csvContent += `,"${temp}"`
         }else{
+          // Phone Number
           this.csvContent += ","
+          // Name
+          temp = (record.from.hasOwnProperty('name')) ? record.from.name : ""
+          this.csvContent += `,"${temp}"`
         }
       }
       let dateOptions = { weekday: 'short' }
