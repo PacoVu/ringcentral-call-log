@@ -528,7 +528,7 @@ var engine = User.prototype = {
             temp = (record.from.hasOwnProperty('extensionNumber')) ? record.from.extensionNumber : ""
           this.csvContent += "," +  temp
           temp = (record.from.hasOwnProperty('name')) ? record.from.name : ""
-          this.csvContent += "," + temp
+          this.csvContent += `,"${temp}"`
         }else{
           this.csvContent += ","
         }
@@ -804,7 +804,7 @@ var engine = User.prototype = {
       this.csvContent += `,${master.To}`
       this.csvContent += `,${firstExtension}`
       this.csvContent += `,${master.Forwarded_To}`
-      this.csvContent += `,${master.Name}`
+      this.csvContent += `,"${master.Name}"`
       this.csvContent += `,${master.Date}`
       this.csvContent += `,${master.Time}`
       this.csvContent += `,${master.Action}`
