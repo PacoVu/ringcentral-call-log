@@ -94,6 +94,8 @@ var engine = User.prototype = {
             if(!fs.existsSync(thisUser.savedPath)){
               fs.mkdirSync(thisUser.savedPath)
             }
+            callback(null, extensionId)
+            res.send('login success');
             rc_platform.getPlatform(function(err, p){
                 if (p != null){
                   p.get('/account/~/extension/~/')
@@ -108,16 +110,16 @@ var engine = User.prototype = {
                       if (jsonObj.permissions.admin.enabled){
                         thisUser.isAdmin = true
                         thisUser.getAccountExtensions("", (err, result) =>{
-                          callback(null, extensionId)
-                          res.send('login success');
+                          //callback(null, extensionId)
+                          //res.send('login success');
                         })
                       }else{
                         var item = {}
                         item['id'] = jsonObj.id
                         item['name'] =`${jsonObj.extensionNumber} - ${fullName}`
                         thisUser.extensionList.push(item)
-                        callback(null, extensionId)
-                        res.send('login success');
+                        //callback(null, extensionId)
+                        //res.send('login success');
                       }
                     })
                     .catch(function(e) {
