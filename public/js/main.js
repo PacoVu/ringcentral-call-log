@@ -42,6 +42,7 @@ function readCallLogs(){
     configs['extensionList'] = [];
   }
   configs['view'] = $("#view").val()
+  configs['perpage'] = $("#perpage").val()
   configs['attachments'] = JSON.stringify($('#attachments').val());
   configs['timeOffset'] = timeOffset
   //return alert (JSON.stringify(configs))

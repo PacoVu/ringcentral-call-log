@@ -239,13 +239,13 @@ var engine = User.prototype = {
         else if (att == "faxes")
           this.downloadAttachements = true
       }
-      var perPage = (req.query.view == "Simple") ? 1000 : 500
+
       var params = {
         view: req.body.view,
         dateFrom: req.body.dateFrom,
         dateTo: req.body.dateTo,
         showBlocked: true,
-        perPage: perPage
+        perPage: parseInt(req.body.perpage)
       }
 
       // return and poll for result
@@ -257,7 +257,7 @@ var engine = User.prototype = {
       this.readReport.downloadCount = 0
       this.readReport.attachmentCount = 0
       this.readReport.status = "ok"
-      this.csvContent = ""
+      this.csvContent = null
       this.maxBlock = 0
       this.appendFile = false
       this.attachmentUrls = []
@@ -354,7 +354,7 @@ var engine = User.prototype = {
                     }
                   }
                   thisUser.maxBlock = 0
-                  thisUser.csvContent = ""
+                  thisUser.csvContent = null
 
                   thisUser.readReport.readInProgress = false
 
@@ -475,7 +475,7 @@ var engine = User.prototype = {
                   }
                 }
                 thisUser.readReport.readInfo =  "Reading done!"
-                thisUser.csvContent = ""
+                thisUser.csvContent = null
                 /*
                 var fullFilePath = `${thisUser.savedPath}${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.csv`
                 fs.writeFile(fullFilePath, thisUser.csvContent, function(err) {
@@ -534,7 +534,7 @@ var engine = User.prototype = {
             }
             this.recordingUrls.push(item)
           }
-        }
+      }
     },
     parseCallRecords: function(p, records){
       var thisUser = this
@@ -578,7 +578,6 @@ var engine = User.prototype = {
           callback(null, null)
         },
         function (err){
-
           if (thisUser.maxBlock > 0){
             console.log(`Done read block = Write ${thisUser.maxBlock} records to file`)
             var fullFilePath = `${thisUser.savedPath}${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.csv`
@@ -598,11 +597,12 @@ var engine = User.prototype = {
             }
           }
           thisUser.maxBlock = 0
-          thisUser.csvContent = ""
+          thisUser.csvContent = null
           var now = new Date().getTime()
           now = (now - thisUser.timing)/1000
           thisUser.readReport.timeElapse = formatDurationTime(now)
-          console.log("Time elapse per 1000 block: " + formatDurationTime(now))
+          console.log("Time elapse: " + formatDurationTime(now))
+          records = null
           return
         }
       )
@@ -629,7 +629,7 @@ var engine = User.prototype = {
       }
     },
     simpleCSVFormat: function(record, attachment){
-      if (this.csvContent == "" && this.appendFile == false)
+      if (this.csvContent == null && this.appendFile == false)
         this.csvContent = '"Type","Phone Number","Name","Date","Time","Action","Action Result","Result Description","Duration","Attachment"'
 
       this.csvContent += "\r\n" + record.type
@@ -685,17 +685,18 @@ var engine = User.prototype = {
         if (this.appendFile == false){
           this.appendFile = true
           fs.writeFileSync(fullFilePath, this.csvContent)
-          this.csvContent = ""
+          //this.csvContent = ""
         }else{
           fs.appendFileSync(fullFilePath, this.csvContent)
-          this.csvContent = ""
+          //this.csvContent = ""
         }
+        this.csvContent = null
         this.maxBlock = 0
       }
     },
     detailedCSVFormat: function(record, attachment){
       //console.log(JSON.stringify(record))
-      if (this.csvContent == "" && this.appendFile == false)
+      if (this.csvContent == null && this.appendFile == false)
         this.csvContent = '"Type","CallId","SessionId","Leg","Direction","From","To","Extension","Forwarded To","Name","Date","Time","Action","Action Result","Result Description","Duration","Included","Purchased","Site","Attachment"'
       var i = 1
       var legs = ""
@@ -969,17 +970,20 @@ var engine = User.prototype = {
       this.csvContent += legs
       this.maxBlock++
       if (this.maxBlock >= 200){
+        console.log("before " + JSON.stringify(process.memoryUsage()))
         console.log(`Interim write ${this.maxBlock} records to file`)
         var fullFilePath = `${this.savedPath}${this.lastReadDateRange}_${this.getExtensionId()}.csv`
         if (this.appendFile == false){
           this.appendFile = true
           fs.writeFileSync(fullFilePath, this.csvContent)
-          this.csvContent = ""
+          //this.csvContent = ""
         }else{
           fs.appendFileSync(fullFilePath, this.csvContent)
-          this.csvContent = ""
+          //this.csvContent = ""
         }
+        this.csvContent = null
         this.maxBlock = 0
+        console.log("after " + JSON.stringify(process.memoryUsage()))
       }
     },
     // not used
