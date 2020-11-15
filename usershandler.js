@@ -166,7 +166,7 @@ var engine = User.prototype = {
       var params = {
           //status: "Enabled",
           //type: "User",
-          perPage: 1000
+          perPage: 500
       }
 
       if (uri != ""){
