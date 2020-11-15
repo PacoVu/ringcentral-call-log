@@ -69,16 +69,7 @@ var engine = User.prototype = {
     },
     loadMainPage: function(req, res){
       //this.readA2PSMSPhoneNumber(res)
-      var extensionList = [
-        {
-          id: "112121212",
-          fullName: "Phong Vu"
-        },
-        {
-          id: "341414343",
-          fullName: "John Wang"
-        }
-      ]
+      var extensionList = []
       res.render('main', {
           userName: this.getUserName(),
           extensionList: JSON.stringify(extensionList),
@@ -1262,13 +1253,13 @@ var engine = User.prototype = {
     },
     createDownloadLinks: function(res){
       var thisUser = this
+      thisUser.downloadLink = ""
       var userDownloadFile = `${this.extensionId}.zip`
-      console.log(userDownloadFile)
       //if (fs.existsSync(this.savedPath)) {
         fs.readdirSync(process.cwd()).forEach((file, index) => {
           if (file.indexOf(userDownloadFile) > 0){
             //const fileName = Path.join(this.savedPath, file);
-            thisUser.downloadLink = file
+            thisUser.downloadLink = "/downloads?filename=" + file
             console.log(thisUser.downloadLink)
           }
         });
@@ -1287,8 +1278,8 @@ var engine = User.prototype = {
         var link = "/downloads?filename=" + zipFile
         res.send({"status":"ok","message":link})
         */
-        var link = "/downloads?filename=" + this.downloadLink
-        res.send({"status":"ok","message":link})
+        //var link = "/downloads?filename=" + this.downloadLink
+        res.send({"status":"ok","message":this.downloadLink})
         /*
         var fullFilePath = `${this.savedPath}${this.getExtensionId()}.csv`
         if(fs.existsSync(fullFilePath)){
@@ -1366,9 +1357,12 @@ var engine = User.prototype = {
       }
     },
     deleteCallLogZipFile: function(res){
-      var zipFile = `CallLog_${this.lastReadDateRange}_${this.getExtensionId()}.zip`
-      if(fs.existsSync(zipFile)){
-        fs.unlinkSync(zipFile)
+      var zipFile = this.downloadLink.split("=")[1] // `CallLog_${this.lastReadDateRange}_${this.getExtensionId()}.zip`
+      console.console.log(zipFile);
+      //var userDownloadFile = `${this.extensionId}.zip`
+      const fileName = Path.join(process.cwd(), zipFile);
+      if(fs.existsSync(fileName)){
+        fs.unlinkSync(fileName);
       }
       res.send({"status":"ok","message":"file deleted"})
     },
