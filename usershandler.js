@@ -374,7 +374,7 @@ var engine = User.prototype = {
                     var zipFile = `CallLog_${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.zip`
                     zipper.sync.zip("./"+thisUser.savedPath).compress().save(zipFile);
 
-                    downloadLink = "/downloads?filename=" + zipFile
+                    thisUser.downloadLink = "/downloads?filename=" + zipFile
                     // delete csv file
                     if (fs.existsSync(thisUser.savedPath)) {
                       fs.readdirSync(thisUser.savedPath).forEach((file, index) => {
@@ -472,7 +472,7 @@ var engine = User.prototype = {
                   var zipFile = `CallLog_${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.zip`
                   zipper.sync.zip("./"+thisUser.savedPath).compress().save(zipFile);
 
-                  downloadLink = "/downloads?filename=" + zipFile
+                  thisUser.downloadLink = "/downloads?filename=" + zipFile
                   // delete csv file
                   if (fs.existsSync(thisUser.savedPath)) {
                     fs.readdirSync(thisUser.savedPath).forEach((file, index) => {
