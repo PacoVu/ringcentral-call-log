@@ -19,12 +19,15 @@ function User(id, mode) {
     readInProgress: false,
     downloadBinaryInProgress: false,
     readInfo: "",
+    timeElapse: 0,
     recordsCount: 0,
+    rowsCount: 0,
     attachmentCount: 0,
     downloadCount: 0
   }
   this.mainCompanyNumber = ""
   this.csvContent = ""
+  this.appendFile = false
   this.callRecords = []
   this.recordingUrls = []
   this.voicemailUrls = []
@@ -38,7 +41,7 @@ function User(id, mode) {
   this.downloadVoicemail = false
   this.download.attachment = false
   this.rc_platform = new RCPlatform(this, mode)
-
+  this.timing = 0
   return this
 }
 
@@ -94,14 +97,14 @@ var engine = User.prototype = {
             if(!fs.existsSync(thisUser.savedPath)){
               fs.mkdirSync(thisUser.savedPath)
             }
-            callback(null, extensionId)
-            res.send('login success');
+            //callback(null, extensionId)
+            //res.send('login success');
             rc_platform.getPlatform(function(err, p){
                 if (p != null){
                   p.get('/account/~/extension/~/')
                     .then(function(response) {
                       var jsonObj = response.json();
-
+                      //console.log(JSON.stringify(jsonObj))
                       thisUser.accountId = jsonObj.account.id
                       var fullName = (jsonObj.contact.hasOwnProperty("firstName")) ? `${jsonObj.contact.firstName} ` : ""
                       fullName += (jsonObj.contact.hasOwnProperty("lastName")) ? jsonObj.contact.lastName : ""
@@ -109,15 +112,27 @@ var engine = User.prototype = {
                       thisUser.extensionList = []
                       if (jsonObj.permissions.admin.enabled){
                         thisUser.isAdmin = true
+                        //thisUser.getAccountExtensions("")
+
                         thisUser.getAccountExtensions("", (err, result) =>{
-                          //callback(null, extensionId)
-                          //res.send('login success');
+                          callback(null, extensionId)
+                          res.send('login success');
                         })
+
                       }else{
+                        /*
                         var item = {}
                         item['id'] = jsonObj.id
                         item['name'] =`${jsonObj.extensionNumber} - ${fullName}`
                         thisUser.extensionList.push(item)
+                        */
+                        //thisUser.getAccountExtensions("")
+
+                        thisUser.getAccountExtensions("", (err, result) =>{
+                          callback(null, extensionId)
+                          res.send('login success');
+                        })
+
                         //callback(null, extensionId)
                         //res.send('login success');
                       }
@@ -146,10 +161,11 @@ var engine = User.prototype = {
       }
     },
     getAccountExtensions: function (uri, callback){
+    //getAccountExtensions: function (uri){
       var endpoint = '/account/~/extension'
       var params = {
-          status: "Enabled",
-          type: "User",
+          //status: "Enabled",
+          //type: "User",
           perPage: 1000
       }
 
@@ -167,12 +183,13 @@ var engine = User.prototype = {
               //console.log(jsonObj)
               var extensionList = []
               for (var record of jsonObj.records){
-                var site = {}
+                var site = {name: `Ext. Num: ${record.extensionNumber}`, code: `Ext. Id: ${record.id}`}
                 if (record.hasOwnProperty('site'))
                   site = record.site
+                var name = record.hasOwnProperty('contact') ? `${record.contact.firstName} ${record.contact.lastName}` : "Unknown"
                 var item = {
                   id: record.id,
-                  name: `${record.extensionNumber} - ${record.contact.firstName} ${record.contact.lastName}`,
+                  name: `${record.extensionNumber} - ${name}`,
                   site: site
                 }
                 //item['id'] = record.id,
@@ -180,15 +197,25 @@ var engine = User.prototype = {
                 thisUser.extensionList.push(item)
               }
               if (jsonObj.navigation.hasOwnProperty("nextPage"))
-                thisUser.readAccountExtensions(jsonObj.navigation.nextPage.uri, callback)
-              else
+                thisUser.getAccountExtensions(jsonObj.navigation.nextPage.uri, callback)
+                //thisUser.getAccountExtensions(jsonObj.navigation.nextPage.uri)
+              else{
+                console.log("COMPLETE getAccountExtensions")
+                //for (var item of thisUser.extensionList)
+                //  console.log(item.id)
+                console.log(thisUser.extensionList.length)
+                //console.log(JSON.stringify(thisUser.extensionList))
                 callback(null, "readAccountExtensions: DONE")
+              }
             })
             .catch(function(e){
-              throw e
+              console.log(e.message)
+              callback(null, "readAccountExtensions: DONE")
             })
+        }else{
+          console.log("DONE getAccountExtensions")
+          callback(null, "readAccountExtensions: DONE")
         }
-        console.log("DONE getAccountExtensions")
       })
     },
     pollReadCallLogResult: function(req, res){
@@ -206,7 +233,7 @@ var engine = User.prototype = {
       var thisUser = this
       this.viewMode = req.body.view
       this.timeOffset = parseInt(req.body.timeOffset)
-      console.log(this.timeOffset)
+      //console.log(this.timeOffset)
       var attachments = JSON.parse(req.body.attachments)
       this.downloadRecording = false
       this.downloadVoicemail = false
@@ -233,9 +260,11 @@ var engine = User.prototype = {
       this.downloadBinaryInProgress = false
       this.readReport.readInfo =  "Reading first page"
       this.readReport.recordsCount = 0
+      this.readReport.rowsCount = 0
       this.readReport.downloadCount = 0
       this.readReport.attachmentCount = 0
       this.csvContent = ""
+      this.appendFile = false
       this.attachmentUrls = []
 
       // delete old .csv file
@@ -291,21 +320,29 @@ var engine = User.prototype = {
           p.get(endpoint, params)
               .then(function (resp) {
                 var jsonObj = resp.json()
+                thisUser.timing = new Date().getTime()
                 thisUser.readReport.readInProgress = true
                 thisUser.readReport.readInfo =  "Reading first page"
                 thisUser.readReport.recordsCount = jsonObj.records.length
+                console.log("Total pages: " + JSON.stringify(jsonObj.paging))
+                //console.log("Total elements: " + jsonObj.paging.totalElements)
                 thisUser.parseCallRecords(p, jsonObj.records)
                 var navigationObj = resp.json().navigation
                 if (navigationObj.hasOwnProperty("nextPage")){
                   thisUser.readCallLogNextPage(navigationObj.nextPage.uri)
                 }else{
                   //thisUser.downloadAttachements(p)
-                  var fullFilePath = `${thisUser.savedPath}${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.csv`
-                  /*
-                  if(fs.existsSync(fullFilePath)){
-                    fs.unlinkSync(fullFilePath)
+
+                  thisUser.readReport.readInProgress = false
+
+                  if (thisUser.readReport.downloadCount == thisUser.readReport.attachmentCount){
+                    console.log("all files are downloaded")
+                    thisUser.downloadBinaryInProgress = false
                   }
-                  */
+                  thisUser.readReport.readInfo =  "Reading done!"
+                  thisUser.csvContent = ""
+                  /*
+                  var fullFilePath = `${thisUser.savedPath}${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.csv`
                   fs.writeFile(fullFilePath, thisUser.csvContent, function(err) {
                     if(err)
                       console.log(err);
@@ -326,28 +363,28 @@ var engine = User.prototype = {
                       thisUser.readReport.readInfo =  "Reading done!"
                       thisUser.csvContent = ""
                   })
-                  /*
-                  var fullNamePath = thisUser.savedPath + thisUser.getExtensionId() + '.json'
-                  var fileContent = JSON.stringify(thisUser.callRecords)
-                  thisUser.callRecords = []
-                  try{
-                    fs.writeFileSync(fullNamePath, fileContent)
-                  }catch(e){
-                    console.log("cannot write file")
-                  }
                   */
                 }
-              });
+              })
+              .catch(function(e){
+                console.log("readAccountCallLog Failed")
+                console.log(e.message)
+              })
+        }else{
+          console.log("ERR" + err)
         }
       })
     },
     readCallLogNextPage: function(url){
       var thisUser = this
+      console.log(url)
       this.rc_platform.getPlatform(function(err, p){
         if (p != null){
           p.get(url)
             .then(function (resp) {
               var jsonObj = resp.json()
+              console.log("Total pages: " + JSON.stringify(jsonObj.paging))
+              //console.log("Total elements: " + jsonObj.paging.totalElements)
               thisUser.readReport.readInProgress = true
               thisUser.readReport.readInfo =  "Reading next page"
               thisUser.readReport.recordsCount += jsonObj.records.length
@@ -369,17 +406,21 @@ var engine = User.prototype = {
                 }
                 console.log("Read next page after " + delayInterval + " milliseconds")
                 setTimeout(function(){
-                    thisUser.readCallLogNextPage(navigationObj.nextPage.uri)
+                  console.log("readCallLogNextPage")
+                  thisUser.readCallLogNextPage(navigationObj.nextPage.uri)
                 }, delayInterval)
               }else{
                 //thisUser.downloadAttachements(p)
+                thisUser.readReport.readInProgress = false
 
-                var fullFilePath = `${thisUser.savedPath}${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.csv`
-                /*
-                if(fs.existsSync(fullFilePath)){
-                  fs.unlinkSync(fullFilePath)
+                if (thisUser.readReport.downloadCount == thisUser.readReport.attachmentCount){
+                  console.log("all files are downloaded")
+                  thisUser.downloadBinaryInProgress = false
                 }
-                */
+                thisUser.readReport.readInfo =  "Reading done!"
+                thisUser.csvContent = ""
+                /*
+                var fullFilePath = `${thisUser.savedPath}${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.csv`
                 fs.writeFile(fullFilePath, thisUser.csvContent, function(err) {
                   if(err)
                     console.log(err);
@@ -398,18 +439,15 @@ var engine = User.prototype = {
                     thisUser.readReport.readInfo =  "Reading done!"
                     thisUser.csvContent = ""
                 })
-                /*
-                var fullNamePath = thisUser.savedPath + thisUser.getExtensionId() + '.json'
-                var fileContent = JSON.stringify(thisUser.callRecords)
-                thisUser.callRecords = []
-                try{
-                  fs.writeFileSync(fullNamePath, fileContent)
-                }catch(e){
-                  console.log("cannot write file")
-                }
                 */
               }
-            });
+            })
+            .catch(function(e){
+              console.log("readCallLogNextPage Failed")
+              console.log(e.message)
+            })
+        }else{
+          console.log("ERR" + err)
         }
       })
     },
@@ -443,6 +481,7 @@ var engine = User.prototype = {
     },
     parseCallRecords: function(p, records){
       var thisUser = this
+      //this.timing = new Date().getTime()
       async.each(records,
         function(record, callback){
           //thisUser.callRecords.push(record)
@@ -482,7 +521,27 @@ var engine = User.prototype = {
           callback(null, null)
         },
         function (err){
-          console.log("Done block")
+          console.log("Done block = Write to file")
+          var fullFilePath = `${thisUser.savedPath}${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.csv`
+          if (thisUser.appendFile == false){
+            thisUser.appendFile = true
+            try{
+              fs.writeFileSync(fullFilePath, thisUser.csvContent)
+            }catch(e){
+              console.log("Write file error " + e)
+            }
+          }else{
+            try{
+              fs.appendFileSync(fullFilePath, thisUser.csvContent)
+            }catch(e){
+              console.log("Append file error " + e)
+            }
+          }
+          thisUser.csvContent = ""
+          var now = new Date().getTime()
+          now = (now - thisUser.timing)/1000
+          thisUser.readReport.timeElapse = formatDurationTime(now)
+          console.log("Time elapse per 1000 block: " + formatDurationTime(now))
           return
         }
       )
@@ -509,8 +568,9 @@ var engine = User.prototype = {
       }
     },
     simpleCSVFormat: function(record, attachment){
-      if (this.csvContent == "")
+      if (this.csvContent == "" && this.appendFile == false)
         this.csvContent = '"Type","Phone Number","Name","Date","Time","Action","Action Result","Result Description","Duration","Attachment"'
+
       this.csvContent += "\r\n" + record.type
       if (record.direction == "Outbound"){
         if (record.hasOwnProperty('to')){
@@ -554,16 +614,21 @@ var engine = User.prototype = {
       this.csvContent += "," + desc
       this.csvContent += "," + formatDurationTime(record.duration)
       this.csvContent += "," + attachment
+
+      this.readReport.rowsCount++
     },
     detailedCSVFormat: function(record, attachment){
       //console.log(JSON.stringify(record))
-      if (this.csvContent == "")
+      if (this.csvContent == "" && this.appendFile == false)
         this.csvContent = '"Type","CallId","SessionId","Leg","Direction","From","To","Extension","Forwarded To","Name","Date","Time","Action","Action Result","Result Description","Duration","Included","Purchased","Site","Attachment"'
       var i = 1
       var legs = ""
       var masterSite = "-"
       var firstExtension = ""
+      //if (record.id == "KbK5ytXPKSsBzUA")
+      //  console.log(JSON.stringify(record))
       for (var item of record.legs){
+        this.readReport.rowsCount++
         if (item.hasOwnProperty('master')){
           var master = {
             Type: item.type,
@@ -635,6 +700,8 @@ var engine = User.prototype = {
                 //site +=  " - " + extObj.site.code
                 master.Site = `${extObj.site.name} - ${extObj.site.code}`
               }
+            }else{
+              console.log("CANNOT FIND EXTENSION FROM EXT LIST???? " + item.extension.id)
             }
           }
 
@@ -824,7 +891,19 @@ var engine = User.prototype = {
       this.csvContent += `,${attachment}`
 
       this.csvContent += legs
+/*
+      var fullFilePath = `${this.savedPath}${this.lastReadDateRange}_${this.getExtensionId()}.csv`
+      if (this.appendFile == false){
+        this.appendFile = true
+        fs.writeFileSync(fullFilePath, this.csvContent)
+        this.csvContent = ""
+      }else{
+        fs.appendFileSync(fullFilePath, this.csvContent)
+        this.csvContent = ""
+      }
+*/
     },
+    // not used
     parseLegData: function(item){
       var row = ""
       if (item.direction == "Outbound"){
@@ -1417,61 +1496,6 @@ function readRecipientFile(fileName){
   //fs.unlinkSync(tempFile);
   return recipientsFromFile
 }
-/*
-function getBatchReport(batchId, pageToken, callback){
-  console.log("getBatchReport")
-  var endpoint = "/account/~/a2p-sms/messages?batchId=" + batchId
-  if (pageToken != "")
-    endpoint += "&pageToken=" + pageToken
-  console.log(endpoint)
-  platform.get(endpoint)
-    .then(function (resp) {
-        var jsonObj = resp.json()
-        //console.log(JSON.stringify(jsonObj))
-        for (var message of jsonObj.messages){
-          //console.log(message)
-          //console.log("========")
-          if (message.messageStatus.toLowerCase() == "queued")
-            queuedCount++
-          else if (message.messageStatus.toLowerCase() == "sent")
-            sentCount++
-          else if (message.messageStatus.toLowerCase() == "delivered")
-            deliveredCount++
-          else if (message.messageStatus.toLowerCase() == "delivery_failed"){
-            deliveredFailedCount++
-          }else if (message.messageStatus.toLowerCase() == "sending_failed"){
-            sendingFailedCount++
-          }else{
-            unknownCount++
-          }
-        }
-        console.log(jsonObj.paging)
-        if (jsonObj.paging.hasOwnProperty("nextPageToken")){
-          console.log("Read next page")
-          setTimeout(function(){
-            getBatchReport(batchId, jsonObj.paging.nextPageToken, callback)
-          }, 2000)
-        }else{
-          console.log("Send 10DCL SMS test completed:")
-          if (sentCount > 0)
-            console.log("Sent count: " + sentCount)
-          if (queuedCount > 0)
-            console.log("Queued count: " + queuedCount)
-          if (deliveredCount > 0)
-            console.log("Delivered count: " + deliveredCount)
-          if (deliveredFailedCount > 0)
-            console.log("DeliveredFailed count: " + deliveredFailedCount)
-          if (sendingFailedCount > 0)
-            console.log("SendingFailed count: " + sendingFailedCount)
-          console.log("=================")
-          callback(null, )
-        }
-    })
-    .catch(function (e) {
-        console.log('ERR ' + e.message || 'Server cannot send messages');
-    });
-}
-*/
 
 function formatDurationTime(processingTime){
   var hour = Math.floor(processingTime / 3600)

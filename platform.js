@@ -38,20 +38,20 @@ RCPlatform.prototype = {
       redirectUri: process.env.RC_APP_REDIRECT_URL
     })
     .then(function (token) {
-      var json = token.json()
-      //console.log("ACCOUNT INFO" + JSON.stringify(json))
+      var jsonObj = token.json()
+      //console.log("ACCOUNT INFO" + JSON.stringify(jsonObj))
       var newToken = {}
-      newToken['access_token'] = json.access_token
-      newToken['expires_in'] = json.expires_in
-      newToken['token_type'] = json.token_type
-      newToken['refresh_token'] = json.refresh_token
-      newToken['refresh_token_expires_in'] = json.refresh_token_expires_in
+      newToken['access_token'] = jsonObj.access_token
+      newToken['expires_in'] = jsonObj.expires_in
+      newToken['token_type'] = jsonObj.token_type
+      newToken['refresh_token'] = jsonObj.refresh_token
+      newToken['refresh_token_expires_in'] = jsonObj.refresh_token_expires_in
       newToken['login_timestamp'] = Date.now() / 1000
       //console.log("ACCESS-TOKEN-EXPIRE-IN: " + json.expires_in)
       //console.log("REFRESH-TOKEN-EXPIRE-IN: " + json.refresh_token_expires_in)
       thisPlatform.token_json = newToken
-      thisPlatform.extensionId = json.owner_id
-      return callback(null, json.owner_id)
+      thisPlatform.extensionId = jsonObj.owner_id
+      return callback(null, jsonObj.owner_id)
     })
     .catch(function (e) {
       console.log('PLATFORM LOGIN ERROR ' + e.message || 'Server cannot authorize user');

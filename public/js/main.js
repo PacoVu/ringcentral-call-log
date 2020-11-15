@@ -1,4 +1,5 @@
 var timeOffset = 0
+var timelapse = 0
 function init(){
   $( "#fromdatepicker" ).datepicker({ dateFormat: "yy-mm-dd"});
   $( "#todatepicker" ).datepicker({dateFormat: "yy-mm-dd"});
@@ -42,6 +43,7 @@ function readCallLogs(){
     }else{
       //$("#progress").toggleClass("show")
       //$("#readingAni").css('display', 'inline');
+      timelapse = 0
       pollResult()
       //window.location = "recordedcalls"
     }
@@ -59,15 +61,28 @@ function pollResult(){
     if (res.readInProgress || res.downloadBinaryInProgress) {
       window.setTimeout(function(){
         //if (canPoll)
-          pollResult()
-      }, 1000)
+        timelapse += 10
+        pollResult()
+      }, 10000)
     }else{
       disableInputs(false)
     }
+    $("#timelapse").html("Time lapse: " + res.timeElapse) //formatDurationTime(timelapse))
     $("#info").html(res.readInfo)
     $("#records-count").html("Read " + res.recordsCount + " records.")
+    $("#rows-count").html("Write " + res.rowsCount + " rows.")
     $("#attachments-count").html("Download " + res.attachmentCount + " attachments." )
   });
+}
+
+function formatDurationTime(processingTime){
+  var hour = Math.floor(processingTime / 3600)
+  //hour = (hour < 10) ? "0"+hour : hour
+  var mins = Math.floor((processingTime % 3600) / 60)
+  mins = (mins < 10) ? "0"+mins : mins
+  var secs = Math.floor(((processingTime % 3600) % 60))
+  secs = (secs < 10) ? "0"+secs : secs
+  return `${hour}:${mins}:${secs}`
 }
 
 function disableInputs(flag){
