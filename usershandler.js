@@ -977,7 +977,7 @@ var engine = User.prototype = {
 
       this.csvContent += legs
       this.maxBlock++
-      if (this.maxBlock >= 500){
+      if (this.maxBlock >= 200){
         console.log(`Interim write ${this.maxBlock} records to file`)
         var fullFilePath = `${this.savedPath}${this.lastReadDateRange}_${this.getExtensionId()}.csv`
         if (this.appendFile == false){
