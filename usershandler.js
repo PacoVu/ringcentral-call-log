@@ -248,13 +248,13 @@ var engine = User.prototype = {
         else if (att == "faxes")
           this.downloadAttachements = true
       }
-      console.log(this.attachments)
+
       var params = {
         view: req.body.view,
         dateFrom: req.body.dateFrom,
         dateTo: req.body.dateTo,
         showBlocked: true,
-        perPage: 1000
+        perPage: 500
       }
 
       // return and poll for result
