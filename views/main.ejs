@@ -74,9 +74,11 @@
         <a id="download_csv" href="javascript:downloadCallLog('CSV')" style="display: none">Download Call Log (.zip)</a>
         <a id="delete_csv" href="javascript:deleteCallLogZipFileCallLog()" style="display: none">Delete Call Log (.zip)</a>
       </div>
-      <br/>
-      <div>
-        <a id="download_existing_csv" href="javascript:downloadCallLog('CSV')" style="display: none">Download Last Read Call Log (.zip)</a>
+      <br/><br/>
+      <div id="last_session" style="display: none">
+        <div>Download Last Session File</div>
+        <a href="javascript:downloadCallLog('CSV')" style="display: none">Download Last Read Call Log (.zip)</a>
+        <a href="javascript:deleteCallLogZipFileCallLog()" style="display: none">Delete Last Read Call Log (.zip)</a>
       </div>
   </section>
   <%- include('_footer') %>

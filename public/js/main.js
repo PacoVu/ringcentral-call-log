@@ -24,12 +24,12 @@ function retrieveDownloadFile(){
   var getting = $.get( url );
   getting.done(function( res ) {
     if (res.status == "ok"){
-      $("#download_existing_csv").css('display', 'block');
+      $("#last_session").css('display', 'block');
     }
   });
 }
 function readCallLogs(){
-  $("#download_existing_csv").css('display', 'none');
+  $("#last_session").css('display', 'none');
   var configs = {}
   configs['dateFrom'] = $("#fromdatepicker").val() + "T00:00:00.001Z"
   var gmtTime = $("#todatepicker").val()

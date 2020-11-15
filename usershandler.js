@@ -248,13 +248,13 @@ var engine = User.prototype = {
         else if (att == "faxes")
           this.downloadAttachements = true
       }
-
+      var perPage = (req.query.view == "Simple") ? 1000 : 500
       var params = {
         view: req.body.view,
         dateFrom: req.body.dateFrom,
         dateTo: req.body.dateTo,
         showBlocked: true,
-        perPage: 500
+        perPage: perPage
       }
 
       // return and poll for result
@@ -1272,7 +1272,10 @@ var engine = User.prototype = {
             console.log(thisUser.downloadLink)
           }
         });
-        res.send({"status":"ok","message":thisUser.downloadLink})
+        if (thisUser.downloadLink.length)
+          res.send({"status":"ok","message":thisUser.downloadLink})
+        else
+          res.send({"status":"empty","message":thisUser.downloadLink})
       //}
     },
     downloadCallLog: function(req, res){
