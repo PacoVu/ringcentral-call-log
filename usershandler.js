@@ -16,6 +16,7 @@ function User(id, mode) {
   this.extensionList = []
   this.startTime = 0
   this.readReport = {
+    status: "ok",
     readInProgress: false,
     downloadBinaryInProgress: false,
     readInfo: "",
@@ -37,6 +38,8 @@ function User(id, mode) {
   this.timeOffset = 0
   this.viewMode = "Simple"
   this.attachments = []
+  this.downloadLink = ""
+  this.maxBlock = 0
   this.downloadRecording = false
   this.downloadVoicemail = false
   this.download.attachment = false
@@ -229,7 +232,6 @@ var engine = User.prototype = {
       res.send(this.readReport)
     },
     readAccountCallLog: function(req, res){
-      var thisRes = res
       var thisUser = this
       this.viewMode = req.body.view
       this.timeOffset = parseInt(req.body.timeOffset)
@@ -252,7 +254,7 @@ var engine = User.prototype = {
         dateFrom: req.body.dateFrom,
         dateTo: req.body.dateTo,
         showBlocked: true,
-        perPage: 500
+        perPage: 1000
       }
 
       // return and poll for result
@@ -263,7 +265,9 @@ var engine = User.prototype = {
       this.readReport.rowsCount = 0
       this.readReport.downloadCount = 0
       this.readReport.attachmentCount = 0
+      this.readReport.status = "ok"
       this.csvContent = ""
+      this.maxBlock = 0
       this.appendFile = false
       this.attachmentUrls = []
 
@@ -276,6 +280,14 @@ var engine = User.prototype = {
           }
         });
       }
+      // delete old .zip file
+      var userDownloadFile = `${this.extensionId}.zip`
+      fs.readdirSync(process.cwd()).forEach((file, index) => {
+        if (file.indexOf(userDownloadFile) > 0){
+          const fileName = Path.join(process.cwd(), file);
+          fs.unlinkSync(fileName);
+        }
+      });
 
       // empty /recordings folder
       var subfolder = `${thisUser.savedPath}recordings`
@@ -309,14 +321,14 @@ var engine = User.prototype = {
       res.send('{"status":"ok"}')
 
       this.lastReadDateRange = `${req.body.dateFrom.split("T")[0]}_${req.body.dateTo.split("T")[0]}`
-      console.log(this.lastReadDateRange)
+      //console.log(this.lastReadDateRange)
 
       this.rc_platform.getPlatform(function(err, p){
         if (p != null){
           thisUser.startTime = Date.now()
-          var endpoint = '/account/~/extension/~/call-log'
-          if (thisUser.isAdmin)
-            endpoint = '/account/~/call-log'
+          //var endpoint = '/account/~/extension/~/call-log'
+          //if (thisUser.isAdmin)
+          var endpoint = '/account/~/call-log'
           p.get(endpoint, params)
               .then(function (resp) {
                 var jsonObj = resp.json()
@@ -324,7 +336,7 @@ var engine = User.prototype = {
                 thisUser.readReport.readInProgress = true
                 thisUser.readReport.readInfo =  "Reading first page"
                 thisUser.readReport.recordsCount = jsonObj.records.length
-                console.log("Total pages: " + JSON.stringify(jsonObj.paging))
+                //console.log("Total pages: " + JSON.stringify(jsonObj.paging))
                 //console.log("Total elements: " + jsonObj.paging.totalElements)
                 thisUser.parseCallRecords(p, jsonObj.records)
                 var navigationObj = resp.json().navigation
@@ -332,15 +344,51 @@ var engine = User.prototype = {
                   thisUser.readCallLogNextPage(navigationObj.nextPage.uri)
                 }else{
                   //thisUser.downloadAttachements(p)
+                  console.log("Done block = Write to file")
+                  if (thisUser.maxBlock > 0){
+                    var fullFilePath = `${thisUser.savedPath}${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.csv`
+                    if (thisUser.appendFile == false){
+                      thisUser.appendFile = true
+                      try{
+                        fs.writeFileSync(fullFilePath, thisUser.csvContent)
+                      }catch(e){
+                        console.log("Write file error " + e)
+                      }
+                    }else{
+                      try{
+                        fs.appendFileSync(fullFilePath, thisUser.csvContent)
+                      }catch(e){
+                        console.log("Append file error " + e)
+                      }
+                    }
+                  }
+                  thisUser.maxBlock = 0
+                  thisUser.csvContent = ""
 
                   thisUser.readReport.readInProgress = false
 
                   if (thisUser.readReport.downloadCount == thisUser.readReport.attachmentCount){
                     console.log("all files are downloaded")
                     thisUser.downloadBinaryInProgress = false
+                    // make zip file and delete .csv file
+                    var zipFile = `CallLog_${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.zip`
+                    zipper.sync.zip("./"+thisUser.savedPath).compress().save(zipFile);
+
+                    downloadLink = "/downloads?filename=" + zipFile
+                    // delete csv file
+                    if (fs.existsSync(thisUser.savedPath)) {
+                      fs.readdirSync(thisUser.savedPath).forEach((file, index) => {
+                        if (file.indexOf(".csv") > 0){
+                          const fileName = Path.join(thisUser.savedPath, file);
+                          fs.unlinkSync(fileName);
+                        }
+                      });
+                    }
                   }
+
                   thisUser.readReport.readInfo =  "Reading done!"
-                  thisUser.csvContent = ""
+
+
                   /*
                   var fullFilePath = `${thisUser.savedPath}${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.csv`
                   fs.writeFile(fullFilePath, thisUser.csvContent, function(err) {
@@ -369,6 +417,10 @@ var engine = User.prototype = {
               .catch(function(e){
                 console.log("readAccountCallLog Failed")
                 console.log(e.message)
+                thisUser.readReport.status = "error"
+                thisUser.downloadBinaryInProgress = false
+                thisUser.readReport.readInProgress = false
+                thisUser.readReport.readInfo =  "You don't have permission to read this account call log!"
               })
         }else{
           console.log("ERR" + err)
@@ -377,16 +429,16 @@ var engine = User.prototype = {
     },
     readCallLogNextPage: function(url){
       var thisUser = this
-      console.log(url)
+      //console.log(url)
       this.rc_platform.getPlatform(function(err, p){
         if (p != null){
           p.get(url)
             .then(function (resp) {
               var jsonObj = resp.json()
-              console.log("Total pages: " + JSON.stringify(jsonObj.paging))
+              //console.log("Total pages: " + JSON.stringify(jsonObj.paging))
               //console.log("Total elements: " + jsonObj.paging.totalElements)
               thisUser.readReport.readInProgress = true
-              thisUser.readReport.readInfo =  "Reading next page"
+              thisUser.readReport.readInfo =  "Reading page " + jsonObj.paging.page
               thisUser.readReport.recordsCount += jsonObj.records.length
               thisUser.parseCallRecords(p, jsonObj.records)
               var jsonObj = resp.response().headers
@@ -416,6 +468,20 @@ var engine = User.prototype = {
                 if (thisUser.readReport.downloadCount == thisUser.readReport.attachmentCount){
                   console.log("all files are downloaded")
                   thisUser.downloadBinaryInProgress = false
+                  // make zip file and delete .csv file
+                  var zipFile = `CallLog_${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.zip`
+                  zipper.sync.zip("./"+thisUser.savedPath).compress().save(zipFile);
+
+                  downloadLink = "/downloads?filename=" + zipFile
+                  // delete csv file
+                  if (fs.existsSync(thisUser.savedPath)) {
+                    fs.readdirSync(thisUser.savedPath).forEach((file, index) => {
+                      if (file.indexOf(".csv") > 0){
+                        const fileName = Path.join(thisUser.savedPath, file);
+                        fs.unlinkSync(fileName);
+                      }
+                    });
+                  }
                 }
                 thisUser.readReport.readInfo =  "Reading done!"
                 thisUser.csvContent = ""
@@ -521,22 +587,26 @@ var engine = User.prototype = {
           callback(null, null)
         },
         function (err){
-          console.log("Done block = Write to file")
-          var fullFilePath = `${thisUser.savedPath}${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.csv`
-          if (thisUser.appendFile == false){
-            thisUser.appendFile = true
-            try{
-              fs.writeFileSync(fullFilePath, thisUser.csvContent)
-            }catch(e){
-              console.log("Write file error " + e)
-            }
-          }else{
-            try{
-              fs.appendFileSync(fullFilePath, thisUser.csvContent)
-            }catch(e){
-              console.log("Append file error " + e)
+
+          if (thisUser.maxBlock > 0){
+            console.log(`Done read block = Write ${thisUser.maxBlock} records to file`)
+            var fullFilePath = `${thisUser.savedPath}${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.csv`
+            if (thisUser.appendFile == false){
+              thisUser.appendFile = true
+              try{
+                fs.writeFileSync(fullFilePath, thisUser.csvContent)
+              }catch(e){
+                console.log("Write file error " + e)
+              }
+            }else{
+              try{
+                fs.appendFileSync(fullFilePath, thisUser.csvContent)
+              }catch(e){
+                console.log("Append file error " + e)
+              }
             }
           }
+          thisUser.maxBlock = 0
           thisUser.csvContent = ""
           var now = new Date().getTime()
           now = (now - thisUser.timing)/1000
@@ -616,6 +686,21 @@ var engine = User.prototype = {
       this.csvContent += "," + attachment
 
       this.readReport.rowsCount++
+
+      this.maxBlock++
+      if (this.maxBlock >= 500){
+        console.log(`Interim write ${this.maxBlock} records to file`)
+        var fullFilePath = `${this.savedPath}${this.lastReadDateRange}_${this.getExtensionId()}.csv`
+        if (this.appendFile == false){
+          this.appendFile = true
+          fs.writeFileSync(fullFilePath, this.csvContent)
+          this.csvContent = ""
+        }else{
+          fs.appendFileSync(fullFilePath, this.csvContent)
+          this.csvContent = ""
+        }
+        this.maxBlock = 0
+      }
     },
     detailedCSVFormat: function(record, attachment){
       //console.log(JSON.stringify(record))
@@ -891,17 +976,20 @@ var engine = User.prototype = {
       this.csvContent += `,${attachment}`
 
       this.csvContent += legs
-/*
-      var fullFilePath = `${this.savedPath}${this.lastReadDateRange}_${this.getExtensionId()}.csv`
-      if (this.appendFile == false){
-        this.appendFile = true
-        fs.writeFileSync(fullFilePath, this.csvContent)
-        this.csvContent = ""
-      }else{
-        fs.appendFileSync(fullFilePath, this.csvContent)
-        this.csvContent = ""
+      this.maxBlock++
+      if (this.maxBlock >= 500){
+        console.log(`Interim write ${this.maxBlock} records to file`)
+        var fullFilePath = `${this.savedPath}${this.lastReadDateRange}_${this.getExtensionId()}.csv`
+        if (this.appendFile == false){
+          this.appendFile = true
+          fs.writeFileSync(fullFilePath, this.csvContent)
+          this.csvContent = ""
+        }else{
+          fs.appendFileSync(fullFilePath, this.csvContent)
+          this.csvContent = ""
+        }
+        this.maxBlock = 0
       }
-*/
     },
     // not used
     parseLegData: function(item){
@@ -1015,6 +1103,7 @@ var engine = User.prototype = {
       this.csvContent += "," + site
       this.csvContent += "," + attachment
     },
+    // not use
     detailedCSVFormat_old: function(record, attachment){
       //console.log(JSON.stringify(record))
       if (this.csvContent == "")
@@ -1171,12 +1260,31 @@ var engine = User.prototype = {
           });
       });
     },
+    createDownloadLinks: function(res){
+      var thisUser = this
+      var userDownloadFile = `${this.extensionId}.zip`
+      console.log(userDownloadFile)
+      //if (fs.existsSync(this.savedPath)) {
+        fs.readdirSync(process.cwd()).forEach((file, index) => {
+          if (file.indexOf(userDownloadFile) > 0){
+            //const fileName = Path.join(this.savedPath, file);
+            thisUser.downloadLink = file
+            console.log(thisUser.downloadLink)
+          }
+        });
+        res.send({"status":"ok","message":thisUser.downloadLink})
+      //}
+    },
     downloadCallLog: function(req, res){
       if (req.query.format == "CSV"){
+        /*
         var zipFile = `CallLog_${this.lastReadDateRange}_${this.getExtensionId()}.zip`
         zipper.sync.zip("./"+this.savedPath).compress().save(zipFile);
 
         var link = "/downloads?filename=" + zipFile
+        res.send({"status":"ok","message":link})
+        */
+        var link = "/downloads?filename=" + this.downloadLink
         res.send({"status":"ok","message":link})
         /*
         var fullFilePath = `${this.savedPath}${this.getExtensionId()}.csv`
@@ -1482,20 +1590,6 @@ var engine = User.prototype = {
 }
 module.exports = User;
 
-function readRecipientFile(fileName){
-  var currentFolder = process.cwd();
-  var tempFile = currentFolder + "/uploads/" + fileName
-  var content = fs.readFileSync(tempFile, 'utf8');
-  content = content.trim();
-  var recipientsFromFile = content.split("\n")
-  if (typeof(recipientsFromFile[0]) != "number"){
-    console.log(recipientsFromFile[0])
-    recipientsFromFile.shift() // remove the first column which is the col name
-  }
-  console.log("=============")
-  //fs.unlinkSync(tempFile);
-  return recipientsFromFile
-}
 
 function formatDurationTime(processingTime){
   var hour = Math.floor(processingTime / 3600)

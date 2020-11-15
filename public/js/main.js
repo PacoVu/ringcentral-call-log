@@ -4,8 +4,8 @@ function init(){
   $( "#fromdatepicker" ).datepicker({ dateFormat: "yy-mm-dd"});
   $( "#todatepicker" ).datepicker({dateFormat: "yy-mm-dd"});
   var pastMonth = new Date();
-  var day = pastMonth.getDate()
-  var month = pastMonth.getMonth() - 1
+  var day = pastMonth.getDate()  - 6
+  var month = pastMonth.getMonth()
   var year = pastMonth.getFullYear()
   if (month < 0){
     month = 11
@@ -15,9 +15,21 @@ function init(){
   $( "#todatepicker" ).datepicker('setDate', new Date());
 
   timeOffset = new Date().getTimezoneOffset()*60000;
+
+  retrieveDownloadFile()
 }
 
+function retrieveDownloadFile(){
+  var url = "retrievedownloadfile"
+  var getting = $.get( url );
+  getting.done(function( res ) {
+    if (res.status == "ok"){
+      $("#download_existing_csv").css('display', 'block');
+    }
+  });
+}
 function readCallLogs(){
+  $("#download_existing_csv").css('display', 'none');
   var configs = {}
   configs['dateFrom'] = $("#fromdatepicker").val() + "T00:00:00.001Z"
   var gmtTime = $("#todatepicker").val()
@@ -67,11 +79,16 @@ function pollResult(){
     }else{
       disableInputs(false)
     }
-    $("#timelapse").html("Time lapse: " + res.timeElapse) //formatDurationTime(timelapse))
-    $("#info").html(res.readInfo)
-    $("#records-count").html("Read " + res.recordsCount + " records.")
-    $("#rows-count").html("Write " + res.rowsCount + " rows.")
-    $("#attachments-count").html("Download " + res.attachmentCount + " attachments." )
+    if (res.status == "ok"){
+      $("#timelapse").html("Time lapse: " + res.timeElapse) //formatDurationTime(timelapse))
+      $("#info").html(res.readInfo)
+      $("#records-count").html("Read " + res.recordsCount + " records.")
+      $("#rows-count").html("Write " + res.rowsCount + " rows.")
+      $("#attachments-count").html("Download " + res.attachmentCount + " attachments." )
+    }else{
+      alert(res.readInfo)
+      logout()
+    }
   });
 }
 

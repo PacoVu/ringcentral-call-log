@@ -98,6 +98,10 @@ app.get('/downloads', function(req, res){
   res.download(file); // Set disposition and send it.
 });
 
+app.get('/retrievedownloadfile', function (req, res) {
+  router.createDownloadLinks(req, res)
+})
+
 app.get('/oauth2callback', function(req, res){
   console.log("callback redirected")
   router.login(req, res)

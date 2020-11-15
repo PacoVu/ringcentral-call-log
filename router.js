@@ -133,6 +133,12 @@ var router = module.exports = {
       return this.forceLogin(req, res)
     users[index].readAccountCallLog(req, res)
   },
+  createDownloadLinks: function(req, res){
+    var index = getUserIndex(req.session.userId)
+    if (index < 0)
+      return this.forceLogin(req, res)
+    users[index].createDownloadLinks(res)
+  },
   pollReadCallLogResult: function(req, res){
     var index = getUserIndex(req.session.userId)
     if (index < 0)
