@@ -166,7 +166,7 @@ var engine = User.prototype = {
       var params = {
           //status: "Enabled",
           //type: "User",
-          perPage: 500
+          perPage: 1000
       }
 
       if (uri != ""){
@@ -252,7 +252,7 @@ var engine = User.prototype = {
         dateFrom: req.body.dateFrom,
         dateTo: req.body.dateTo,
         showBlocked: true,
-        perPage: 1000
+        perPage: 500
       }
 
       // return and poll for result
