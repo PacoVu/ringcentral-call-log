@@ -330,8 +330,9 @@ var engine = User.prototype = {
                 //console.log("Total pages: " + JSON.stringify(jsonObj.paging))
                 //console.log("Total elements: " + jsonObj.paging.totalElements)
                 thisUser.parseCallRecords(p, jsonObj.records)
-                var navigationObj = resp.json().navigation
+                var navigationObj = jsonObj.navigation
                 if (navigationObj.hasOwnProperty("nextPage")){
+                  jsonObj = null
                   thisUser.readCallLogNextPage(navigationObj.nextPage.uri)
                 }else{
                   //thisUser.downloadAttachements(p)
@@ -413,7 +414,7 @@ var engine = User.prototype = {
               console.log("limitRemaining: " + limitRemaining)
               var navigationObj = resp.json().navigation
               if (navigationObj.hasOwnProperty("nextPage")){
-                var delayInterval = 100
+                var delayInterval = 500
                 if (limitRemaining == 0){
                     console.log("No remaining => calculate waiting time")
                     var now = Date.now()
