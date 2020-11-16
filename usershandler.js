@@ -356,16 +356,13 @@ var engine = User.prototype = {
                 thisUser.maxBlock = 0
                 thisUser.csvContent = null
 */
-                console.log("IS UNDEFINED? " + thisUser.csvContent)
                 var navigationObj = jsonObj.navigation
                 if (navigationObj.hasOwnProperty("nextPage")){
                   jsonObj = null
                   thisUser.readCallLogNextPage(navigationObj.nextPage.uri)
                 }else{
                   //thisUser.downloadAttachements(p)
-
                   thisUser.readReport.readInProgress = false
-
                   if (thisUser.readReport.downloadCount == thisUser.readReport.attachmentCount){
                     console.log("all files are downloaded")
                     thisUser.downloadBinaryInProgress = false
@@ -420,8 +417,9 @@ var engine = User.prototype = {
               var limitWindow = parseInt(jsonObj['_headers']['x-rate-limit-window'][0])
               console.log("limitRemaining: " + limitRemaining)
               var navigationObj = resp.json().navigation
+
               if (navigationObj.hasOwnProperty("nextPage")){
-                var delayInterval = 500
+                var delayInterval = 100
                 if (limitRemaining == 0){
                     console.log("No remaining => calculate waiting time")
                     var now = Date.now()
@@ -429,11 +427,21 @@ var engine = User.prototype = {
                     delayInterval = (limitWindow / limit) * 1000
                     thisUser.startTime = now + delayInterval
                 }
+                jsonObj = null
+                try {
+                  if (global.gc) {
+                    console.log("calling gc")
+                    global.gc();
+                  }
+                } catch (e) {
+                  console.log("`node --expose-gc index.js`");
+                  //process.exit();
+                }
                 console.log("Read next page after " + delayInterval + " milliseconds")
+                var nextPageUri = navigationObj.nextPage.uri
                 setTimeout(function(){
-                  console.log("readCallLogNextPage")
-                  thisUser.readCallLogNextPage(navigationObj.nextPage.uri)
-                }, delayInterval)
+                  thisUser.readCallLogNextPage(nextPageUri)
+                }, delayInterval, nextPageUri)
               }else{
                 //thisUser.downloadAttachements(p)
                 thisUser.readReport.readInProgress = false
@@ -459,27 +467,6 @@ var engine = User.prototype = {
                 thisUser.readReport.readInfo =  "Reading done!"
                 thisUser.csvContent = null
                 jsonObj = null
-                /*
-                var fullFilePath = `${thisUser.savedPath}${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.csv`
-                fs.writeFile(fullFilePath, thisUser.csvContent, function(err) {
-                  if(err)
-                    console.log(err);
-                  else
-                    console.log("download file is ready.");
-                    console.log("DONE - no more next page")
-                    //if (thisUser.attachmentUrls.length){
-                    //  thisUser.downloadFaxAttachements(p)
-                    //}else
-                    thisUser.readReport.readInProgress = false
-
-                    if (thisUser.readReport.downloadCount == thisUser.readReport.attachmentCount){
-                      console.log("all files are downloaded")
-                      thisUser.downloadBinaryInProgress = false
-                    }
-                    thisUser.readReport.readInfo =  "Reading done!"
-                    thisUser.csvContent = ""
-                })
-                */
               }
             })
             .catch(function(e){
