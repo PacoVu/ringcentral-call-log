@@ -476,6 +476,7 @@ var engine = User.prototype = {
                 }
                 thisUser.readReport.readInfo =  "Reading done!"
                 thisUser.csvContent = null
+                jsonObj = null
                 /*
                 var fullFilePath = `${thisUser.savedPath}${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.csv`
                 fs.writeFile(fullFilePath, thisUser.csvContent, function(err) {
@@ -1268,9 +1269,17 @@ var engine = User.prototype = {
           }
         });
         if (thisUser.downloadLink.length)
-          res.send({"status":"ok","message":thisUser.downloadLink})
+          res.send({
+            status:"ok",
+            message:thisUser.downloadLink,
+            readReport: thisUser.readReport
+          })
         else
-          res.send({"status":"empty","message":thisUser.downloadLink})
+          res.send({
+            status:"empty",
+            message:thisUser.downloadLink,
+            readReport: thisUser.readReport
+          })
       //}
     },
     downloadCallLog: function(req, res){

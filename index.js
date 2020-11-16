@@ -27,12 +27,14 @@ var router = require('./router');
 
 app.get('/', function (req, res) {
   console.log('load option page /')
-  //res.render('index')
+  res.render('index')
+  /*
   if (req.session.extensionId != 0)
     router.logout(req, res)
   else{
     res.render('index')
   }
+  */
 })
 app.get('/login', function (req, res) {
   console.log('login to /')

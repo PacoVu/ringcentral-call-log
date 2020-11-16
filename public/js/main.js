@@ -1,5 +1,4 @@
 var timeOffset = 0
-var timelapse = 0
 function init(){
   $( "#fromdatepicker" ).datepicker({ dateFormat: "yy-mm-dd"});
   $( "#todatepicker" ).datepicker({dateFormat: "yy-mm-dd"});
@@ -25,6 +24,14 @@ function retrieveDownloadFile(){
   getting.done(function( res ) {
     if (res.status == "ok"){
       $("#last_session").css('display', 'block');
+    }
+
+    if (res.readReport.readInProgress || res.readReport.downloadBinaryInProgress){
+      disableInputs(true)
+      window.setTimeout(function(){
+        pollResult()
+      }, 1000)
+
     }
   });
 }
@@ -56,7 +63,6 @@ function readCallLogs(){
     }else{
       //$("#progress").toggleClass("show")
       //$("#readingAni").css('display', 'inline');
-      timelapse = 0
       pollResult()
       //window.location = "recordedcalls"
     }
@@ -69,19 +75,17 @@ function readCallLogs(){
 function pollResult(){
   var url = "pollresult"
   var getting = $.get( url );
-  // = true
+
   getting.done(function( res ) {
     if (res.readInProgress || res.downloadBinaryInProgress) {
       window.setTimeout(function(){
-        //if (canPoll)
-        timelapse += 10
         pollResult()
       }, 10000)
     }else{
       disableInputs(false)
     }
     if (res.status == "ok"){
-      $("#timelapse").html("Time lapse: " + res.timeElapse) //formatDurationTime(timelapse))
+      $("#timelapse").html("Time lapse: " + res.timeElapse)
       $("#info").html(res.readInfo)
       $("#records-count").html("Read " + res.recordsCount + " records.")
       $("#rows-count").html("Write " + res.rowsCount + " rows.")

@@ -52,7 +52,7 @@ var router = module.exports = {
       console.log("Must be a reload page")
       var index = getUserIndex(req.session.userId)
       if (index >= 0)
-        users[index].loadSendSMSPage(req, res)
+        users[index].loadMainPage(req, res)
       else{
         this.forceLogin(req, res)
       }
@@ -70,6 +70,7 @@ var router = module.exports = {
     users[index].login(req, res, function(err, extensionId){
       // result contain extensionId. Use it to check for orphan user and remove it
       if (!err){
+        /* remove
         console.log("USERLENGTH: " + users.length)
         for (var i = 0; i < users.length; i++){
           console.log("REMOVING")
@@ -80,6 +81,43 @@ var router = module.exports = {
             users[i] = null
             users.splice(i, 1);
             break
+          }
+        }
+        */
+        // replace
+        console.log("USERLENGTH: " + users.length)
+        var shouldReplace = false
+        var oldUser = null
+        var newUser = null
+        var oldUserIndex = -1
+        var newUserIndex = -1
+        for (var i = 0; i < users.length; i++){
+          console.log("REPLACING")
+          var extId = users[i].getExtensionId()
+          var userId = users[i].getUserId()
+          if (extId == extensionId && userId == req.session.userId){ // new user
+            newUser = users[i]
+            newUserIndex = i
+            if (oldUser != null){
+              req.session.userId = oldUser.getUserId()
+              users[newUserIndex] = null
+              users.splice(newUserIndex, 1);
+              console.log("oldUser.extensionList form new user")
+              console.log(oldUser.extensionList)
+              break
+            }
+          }
+          if (extId == extensionId && userId != req.session.userId){ // old user
+            oldUser = users[i]
+            oldUserIndex = i
+            if (newUser != null){
+              req.session.userId = userId
+              users[newUserIndex] = null
+              users.splice(newUserIndex, 1);
+              console.log("oldUser.extensionList from old user")
+              console.log(oldUser.extensionList)
+              break
+            }
           }
         }
       }
