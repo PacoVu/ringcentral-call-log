@@ -26,10 +26,16 @@ function User(id, mode) {
     attachmentCount: 0,
     downloadCount: 0
   }
+  this.readCallLogParams = {
+    view:"Simple",
+    dateFrom: "",
+    dateTo:"",
+    perPage: 500,
+    attachments: []
+  }
   this.mainCompanyNumber = ""
   this.csvContent = ""
   this.appendFile = false
-  this.callRecords = []
   this.recordingUrls = []
   this.voicemailUrls = []
   this.attachmentUrls = []
@@ -194,11 +200,11 @@ var engine = User.prototype = {
                 thisUser.getAccountExtensions(jsonObj.navigation.nextPage.uri, callback)
                 //thisUser.getAccountExtensions(jsonObj.navigation.nextPage.uri)
               else{
+                jsonObj = null
                 console.log("COMPLETE getAccountExtensions")
                 //for (var item of thisUser.extensionList)
                 //  console.log(item.id)
                 console.log(thisUser.extensionList.length)
-                //console.log(JSON.stringify(thisUser.extensionList))
                 callback(null, "readAccountExtensions: DONE")
               }
             })
@@ -240,7 +246,7 @@ var engine = User.prototype = {
           this.downloadAttachements = true
       }
 
-      var params = {
+      this.readCallLogParams = {
         view: req.body.view,
         dateFrom: req.body.dateFrom,
         dateTo: req.body.dateTo,
@@ -317,45 +323,46 @@ var engine = User.prototype = {
       this.rc_platform.getPlatform(function(err, p){
         if (p != null){
           thisUser.startTime = Date.now()
-          //var endpoint = '/account/~/extension/~/call-log'
-          //if (thisUser.isAdmin)
+          thisUser.timing = new Date().getTime()
+          thisUser.readReport.readInProgress = true
+          thisUser.readReport.readInfo =  "Reading first page"
           var endpoint = '/account/~/call-log'
-          p.get(endpoint, params)
+          p.get(endpoint, thisUser.readCallLogParams)
               .then(function (resp) {
                 var jsonObj = resp.json()
-                thisUser.timing = new Date().getTime()
-                thisUser.readReport.readInProgress = true
-                thisUser.readReport.readInfo =  "Reading first page"
                 thisUser.readReport.recordsCount = jsonObj.records.length
                 //console.log("Total pages: " + JSON.stringify(jsonObj.paging))
                 //console.log("Total elements: " + jsonObj.paging.totalElements)
                 thisUser.parseCallRecords(p, jsonObj.records)
+/*
+                console.log("Done block = Write to file if something left")
+                if (thisUser.maxBlock > 0){
+                  var fullFilePath = `${thisUser.savedPath}${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.csv`
+                  if (thisUser.appendFile == false){
+                    thisUser.appendFile = true
+                    try{
+                      fs.writeFileSync(fullFilePath, thisUser.csvContent)
+                    }catch(e){
+                      console.log("Write file error " + e)
+                    }
+                  }else{
+                    try{
+                      fs.appendFileSync(fullFilePath, thisUser.csvContent)
+                    }catch(e){
+                      console.log("Append file error " + e)
+                    }
+                  }
+                }
+                thisUser.maxBlock = 0
+                thisUser.csvContent = null
+*/
+                console.log("IS UNDEFINED? " + thisUser.csvContent)
                 var navigationObj = jsonObj.navigation
                 if (navigationObj.hasOwnProperty("nextPage")){
                   jsonObj = null
                   thisUser.readCallLogNextPage(navigationObj.nextPage.uri)
                 }else{
                   //thisUser.downloadAttachements(p)
-                  console.log("Done block = Write to file")
-                  if (thisUser.maxBlock > 0){
-                    var fullFilePath = `${thisUser.savedPath}${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.csv`
-                    if (thisUser.appendFile == false){
-                      thisUser.appendFile = true
-                      try{
-                        fs.writeFileSync(fullFilePath, thisUser.csvContent)
-                      }catch(e){
-                        console.log("Write file error " + e)
-                      }
-                    }else{
-                      try{
-                        fs.appendFileSync(fullFilePath, thisUser.csvContent)
-                      }catch(e){
-                        console.log("Append file error " + e)
-                      }
-                    }
-                  }
-                  thisUser.maxBlock = 0
-                  thisUser.csvContent = null
 
                   thisUser.readReport.readInProgress = false
 
@@ -487,7 +494,6 @@ var engine = User.prototype = {
     parseCallRecords_no_download: function(p, records){
       for (var record of records) {
           this.detailedCSVFormat()
-          //this.callRecords.push(record)
           if (record.hasOwnProperty("message")){
             if (record.message.type == "VoiceMail"){
               var voicemailUri = record.message.uri.replace("platform", "media")
@@ -517,7 +523,6 @@ var engine = User.prototype = {
       //this.timing = new Date().getTime()
       async.each(records,
         function(record, callback){
-          //thisUser.callRecords.push(record)
           var attachment = "-"
           if (record.hasOwnProperty("message")){
             if (record.message.type == "VoiceMail" && thisUser.downloadVoicemail){
@@ -1139,13 +1144,15 @@ var engine = User.prototype = {
           res.send({
             status:"ok",
             message:thisUser.downloadLink,
-            readReport: thisUser.readReport
+            readReport: thisUser.readReport,
+            readParams: thisUser.readCallLogParams
           })
         else
           res.send({
             status:"empty",
             message:thisUser.downloadLink,
-            readReport: thisUser.readReport
+            readReport: thisUser.readReport,
+            readParams: thisUser.readCallLogParams
           })
       //}
     },
@@ -1156,7 +1163,7 @@ var engine = User.prototype = {
     },
     deleteCallLogZipFile: function(res){
       var zipFile = this.downloadLink.split("=")[1] // `CallLog_${this.lastReadDateRange}_${this.getExtensionId()}.zip`
-      console.console.log(zipFile);
+      console.log(zipFile);
       //var userDownloadFile = `${this.extensionId}.zip`
       const fileName = Path.join(process.cwd(), zipFile);
       if(fs.existsSync(fileName)){

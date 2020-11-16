@@ -83,8 +83,8 @@
       <br/><br/>
       <div id="last_session" style="display: none">
         <div>Download Last Session File</div>
-        <a href="javascript:downloadCallLog('CSV')" style="display: none">Download Last Read Call Log (.zip)</a>
-        <a href="javascript:deleteCallLogZipFileCallLog()" style="display: none">Delete Last Read Call Log (.zip)</a>
+        <a id="download_lastsession_csv" href="javascript:downloadCallLog('CSV')" style="display: block">Download Last Read Call Log (.zip)</a>
+        <a id="delete_lastsession_csv" href="javascript:deleteCallLogZipFileCallLog()" style="display: block">Delete Last Read Call Log (.zip)</a>
       </div>
   </section>
   <%- include('_footer') %>

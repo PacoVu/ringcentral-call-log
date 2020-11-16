@@ -25,13 +25,17 @@ function retrieveDownloadFile(){
     if (res.status == "ok"){
       $("#last_session").css('display', 'block');
     }
-
     if (res.readReport.readInProgress || res.readReport.downloadBinaryInProgress){
+      // set params before disable it
+      $( "#fromdatepicker" ).datepicker('setDate', res.readParams.dateFrom.split("T")[0]);
+      $( "#todatepicker" ).datepicker('setDate', res.readParams.dateTo.split("T")[0]);
+      $("#view").val(res.readParams.view).change();
+      $("#perpage").val(res.readParams.perPage).change();
+
       disableInputs(true)
       window.setTimeout(function(){
-        pollResult()
+          pollResult()
       }, 1000)
-
     }
   });
 }
@@ -39,9 +43,7 @@ function readCallLogs(){
   $("#last_session").css('display', 'none');
   var configs = {}
   configs['dateFrom'] = $("#fromdatepicker").val() + "T00:00:00.001Z"
-  var gmtTime = $("#todatepicker").val()
-  //alert(gmtTime)
-  //return
+
   configs['dateTo'] = $("#todatepicker").val() + "T23:59:59.999Z"
   if ($('#extensionids') != undefined) {
     configs['extensionList'] = JSON.stringify($('#extensionids').val());
