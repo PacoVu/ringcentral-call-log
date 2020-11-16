@@ -1,7 +1,7 @@
 {
-  "name": "ringcentral-send-tollfree-sms",
+  "name": "ringcentral-call-log",
   "version": "1.0.0",
-  "description": "Send toll-free SMS",
+  "description": "Read Call Log",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
