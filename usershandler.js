@@ -427,6 +427,8 @@ var engine = User.prototype = {
                     delayInterval = (limitWindow / limit) * 1000
                     thisUser.startTime = now + delayInterval
                 }
+                var pro = process.memoryUsage()
+                console.log("Before Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
                 jsonObj = null
                 try {
                   if (global.gc) {
@@ -437,6 +439,8 @@ var engine = User.prototype = {
                   console.log("`node --expose-gc index.js`");
                   //process.exit();
                 }
+                var pro = process.memoryUsage()
+                console.log("After Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
                 console.log("Read next page after " + delayInterval + " milliseconds")
                 var nextPageUri = navigationObj.nextPage.uri
                 setTimeout(function(){
@@ -939,7 +943,7 @@ var engine = User.prototype = {
       this.csvContent += legs
       this.maxBlock++
       if (this.maxBlock >= 200){
-        console.log("before " + JSON.stringify(process.memoryUsage()))
+        //console.log("before Heap Total: " + (process.memoryUsage().heapTotal/1024).toFix(1) + "Used: " + (process.memoryUsage().heapUsed/1024).toFix(1))
         console.log(`Interim write ${this.maxBlock} records to file`)
         var fullFilePath = `${this.savedPath}${this.lastReadDateRange}_${this.getExtensionId()}.csv`
         if (this.appendFile == false){
@@ -953,7 +957,7 @@ var engine = User.prototype = {
         this.csvContent = null
         this.maxBlock = 0
         master = null
-        console.log("after " + JSON.stringify(process.memoryUsage()))
+        //console.log("After Heap Total: " + (process.memoryUsage().heapTotal/1024).toFix(1) + "Used: " + (process.memoryUsage().heapUsed/1024).toFix(1))
       }
     },
     // not use
