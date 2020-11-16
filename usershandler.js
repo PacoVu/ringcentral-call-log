@@ -942,8 +942,7 @@ var engine = User.prototype = {
 
       this.csvContent += legs
       this.maxBlock++
-      if (this.maxBlock >= 200){
-        //console.log("before Heap Total: " + (process.memoryUsage().heapTotal/1024).toFix(1) + "Used: " + (process.memoryUsage().heapUsed/1024).toFix(1))
+      if (this.maxBlock >= 500){
         console.log(`Interim write ${this.maxBlock} records to file`)
         var fullFilePath = `${this.savedPath}${this.lastReadDateRange}_${this.getExtensionId()}.csv`
         if (this.appendFile == false){
@@ -957,7 +956,6 @@ var engine = User.prototype = {
         this.csvContent = null
         this.maxBlock = 0
         master = null
-        //console.log("After Heap Total: " + (process.memoryUsage().heapTotal/1024).toFix(1) + "Used: " + (process.memoryUsage().heapUsed/1024).toFix(1))
       }
     },
     // not use
