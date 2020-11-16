@@ -1,7 +1,6 @@
 var RC = require('ringcentral')
 var fs = require('fs')
 var https = require('https');
-var zipper = require('zip-local');
 const Path = require('path');
 var async = require("async");
 const RCPlatform = require('./platform.js')
@@ -368,6 +367,7 @@ var engine = User.prototype = {
                     thisUser.downloadBinaryInProgress = false
                     // make zip file and delete .csv file
                     var zipFile = `CallLog_${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.zip`
+                    var zipper = require('zip-local');
                     zipper.sync.zip("./"+thisUser.savedPath).compress().save(zipFile);
 
                     thisUser.downloadLink = "/downloads?filename=" + zipFile
@@ -379,6 +379,15 @@ var engine = User.prototype = {
                           fs.unlinkSync(fileName);
                         }
                       });
+                    }
+                    jsonObj = null
+                    zipper = null
+                    try {
+                      if (global.gc) {
+                        global.gc();
+                      }
+                    } catch (e) {
+                      console.log("`node --expose-gc index.js`");
                     }
                   }
                   thisUser.readReport.readInfo =  "Reading done!"
@@ -449,12 +458,14 @@ var engine = User.prototype = {
               }else{
                 //thisUser.downloadAttachements(p)
                 thisUser.readReport.readInProgress = false
-
+                thisUser.csvContent = null
+                jsonObj = null
                 if (thisUser.readReport.downloadCount == thisUser.readReport.attachmentCount){
                   console.log("all files are downloaded")
                   thisUser.downloadBinaryInProgress = false
                   // make zip file and delete .csv file
                   var zipFile = `CallLog_${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.zip`
+                  var zipper = require('zip-local');
                   zipper.sync.zip("./"+thisUser.savedPath).compress().save(zipFile);
 
                   thisUser.downloadLink = "/downloads?filename=" + zipFile
@@ -467,10 +478,16 @@ var engine = User.prototype = {
                       }
                     });
                   }
+                  zipper = null
+                  try {
+                    if (global.gc) {
+                      global.gc();
+                    }
+                  } catch (e) {
+                    console.log("`node --expose-gc index.js`");
+                  }
                 }
                 thisUser.readReport.readInfo =  "Reading done!"
-                thisUser.csvContent = null
-                jsonObj = null
               }
             })
             .catch(function(e){
@@ -752,6 +769,8 @@ var engine = User.prototype = {
               }
             }else{
               console.log("CANNOT FIND EXTENSION FROM EXT LIST???? " + item.extension.id)
+              master.Extension = "Not found ext. id " + item.extension.id
+              master.Site = "-"
             }
           }
 
