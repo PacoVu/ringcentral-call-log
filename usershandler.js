@@ -376,33 +376,7 @@ var engine = User.prototype = {
                       });
                     }
                   }
-
                   thisUser.readReport.readInfo =  "Reading done!"
-
-
-                  /*
-                  var fullFilePath = `${thisUser.savedPath}${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.csv`
-                  fs.writeFile(fullFilePath, thisUser.csvContent, function(err) {
-                    if(err)
-                      console.log(err);
-                    else
-                      console.log("download file is ready.");
-                      console.log("DONE - no next page")
-                      //if (thisUser.attachmentUrls.length){
-                      //  thisUser.downloadFaxAttachements(p)
-                      //}else
-
-                      thisUser.readReport.readInProgress = false
-                      if (thisUser.readReport.downloadCount == thisUser.readReport.attachmentCount){
-                        console.log("all files are downloaded")
-                        thisUser.downloadBinaryInProgress = false
-                      }
-
-                      //thisUser.readReport.readInProgress = false
-                      thisUser.readReport.readInfo =  "Reading done!"
-                      thisUser.csvContent = ""
-                  })
-                  */
                 }
               })
               .catch(function(e){
@@ -576,6 +550,7 @@ var engine = User.prototype = {
             thisUser.simpleCSVFormat(record, attachment)
           else
             thisUser.detailedCSVFormat(record, attachment)
+          record = null
           callback(null, null)
         },
         function (err){
@@ -984,122 +959,12 @@ var engine = User.prototype = {
         }
         this.csvContent = null
         this.maxBlock = 0
+        master = null
         console.log("after " + JSON.stringify(process.memoryUsage()))
       }
     },
-    // not used
-    parseLegData: function(item){
-      var row = ""
-      if (item.direction == "Outbound"){
-        this.csvContent += ",Outgoing"
-        // from
-        if (item.hasOwnProperty('from')){
-          var temp = (item.from.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.from.phoneNumber) : ""
-          if (temp == "")
-            temp = (item.from.hasOwnProperty('extensionNumber')) ? item.from.extensionNumber : ""
-          this.csvContent += "," +  temp
-        }else{
-          this.csvContent += ","
-        }
-        // to
-        if (item.hasOwnProperty('to')){
-          var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
-          if (temp == "")
-            temp = (item.to.hasOwnProperty('extensionNumber')) ? item.to.extensionNumber : ""
-          this.csvContent += "," +  temp
-        }else{
-          this.csvContent += ","
-        }
-      }else{
-        this.csvContent += ",Incoming"
-        // from
-        if (item.hasOwnProperty('from')){
-          var temp = (item.from.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.from.phoneNumber) : ""
-          if (temp == "")
-            temp = (item.from.hasOwnProperty('extensionNumber')) ? item.from.extensionNumber : ""
-          this.csvContent += "," +  temp
-        }else{
-          this.csvContent += ","
-        }
-        // to
-        if (item.hasOwnProperty('to')){
-          var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
-          if (temp == "")
-            temp = (item.to.hasOwnProperty('extensionNumber')) ? item.to.extensionNumber : ""
-          this.csvContent += "," +  temp
-        }else{
-          this.csvContent += ","
-        }
-      }
-
-      // extension
-      var site = "-"
-      if (item.hasOwnProperty('extension')){
-        var extObj = this.extensionList.find(o => o.id === item.extension.id)
-        if (extObj){
-          //console.log(extObj.name)
-          this.csvContent += "," + extObj.name
-          //console.log(extObj.site)
-          if (extObj.hasOwnProperty('site')){
-            //site = (extObj.site.hasOwnProperty('name')) ? extObj.site.name : ""
-            //site +=  " - " + extObj.site.code
-            site = `${extObj.site.name} - ${extObj.site.code}`
-          }
-        }else{
-          this.csvContent += ","
-        }
-      }else{
-        this.csvContent += ","
-      }
-
-      // Forwarded to
-      if (record.direction == "Inbound" && item.direction == "Outbound"){
-        var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
-        this.csvContent += "," + temp
-      }else
-        this.csvContent += ","
-
-      // Name
-      if (item.direction == "Outbound"){
-        var temp = ""
-        if (item.hasOwnProperty('to')){
-          var temp = (item.to.hasOwnProperty('name')) ? item.to.name : ""
-        }
-        this.csvContent += `,"${temp}"`
-      }else{
-        var temp = ""
-        if (item.hasOwnProperty('from')){
-          temp = (item.from.hasOwnProperty('name')) ? item.from.name : ""
-        }
-        this.csvContent += `,"${temp}"`
-      }
-
-      let dateOptions = { weekday: 'short' }
-      let timeOptions = { hour: '2-digit',minute: '2-digit' }
-      var date = new Date(item.startTime)
-      var dateStr = date.toLocaleDateString("en-US", dateOptions)
-      dateStr += " " + date.toLocaleDateString("en-US")
-      this.csvContent += "," + dateStr
-      this.csvContent += "," + date.toLocaleTimeString("en-US")
-      this.csvContent += "," + item.action + "," + item.result
-      var desc = (item.hasOwnProperty('reasonDescription')) ? item.reasonDescription : ""
-      this.csvContent += "," + desc
-      this.csvContent += "," + formatDurationTime(item.duration)
-
-      //if (record.direction == item.direction){
-      //if (item.hasOwnProperty('master')){
-      if (site != "-"){
-        // included
-        this.csvContent += "," + record.billing.costIncluded
-        // purchased
-        this.csvContent += "," + record.billing.costPurchased
-      }else{
-        this.csvContent += ",-,-"
-      }
-      this.csvContent += "," + site
-      this.csvContent += "," + attachment
-    },
     // not use
+    /*
     detailedCSVFormat_old: function(record, attachment){
       //console.log(JSON.stringify(record))
       if (this.csvContent == "")
@@ -1229,6 +1094,7 @@ var engine = User.prototype = {
         this.csvContent += "," + attachment
       }
     },
+    */
     saveBinaryFile: function(p, type, fileName, contentUri){
       console.log("saveBinaryFile")
       var dir = this.savedPath + type + "/"
@@ -1284,89 +1150,7 @@ var engine = User.prototype = {
     },
     downloadCallLog: function(req, res){
       if (req.query.format == "CSV"){
-        /*
-        var zipFile = `CallLog_${this.lastReadDateRange}_${this.getExtensionId()}.zip`
-        zipper.sync.zip("./"+this.savedPath).compress().save(zipFile);
-
-        var link = "/downloads?filename=" + zipFile
-        res.send({"status":"ok","message":link})
-        */
-        //var link = "/downloads?filename=" + this.downloadLink
         res.send({"status":"ok","message":this.downloadLink})
-        /*
-        var fullFilePath = `${this.savedPath}${this.getExtensionId()}.csv`
-        if(fs.existsSync(fullFilePath)){
-          fs.unlinkSync(fullFilePath)
-        }
-        var thisUser = this
-        fs.writeFile(fullFilePath, this.csvContent, function(err) {
-          if(err)
-            console.log(err);
-          else
-            console.log("download file is ready.");
-          var zipFile = "CallLog_"+thisUser.getExtensionId() + ".zip"
-          zipper.sync.zip("./"+thisUser.savedPath).compress().save(zipFile);
-
-          var link = "/downloads?filename=" + zipFile
-          res.send({"status":"ok","message":link})
-        })
-        */
-        /*
-        var thisUser = this
-        if (this.viewMode == "Simple"){
-          this.createSimpleCSVFormat((err, result) =>{
-            if (err == null){
-              var zipFile = "CallLog_"+thisUser.getExtensionId() + ".zip"
-              zipper.sync.zip("./"+thisUser.savedPath).compress().save(zipFile);
-
-              var link = "/downloads?filename=" + zipFile
-              res.send({"status":"ok","message":link})
-            }
-          })
-        }else{
-          this.createDetailedCSVFormat((err, result) =>{
-            if (err == null){
-              var zipFile = "CallLog_"+thisUser.getExtensionId() + ".zip"
-              zipper.sync.zip("./"+thisUser.savedPath).compress().save(zipFile);
-
-              var link = "/downloads?filename=" + zipFile
-              res.send({"status":"ok","message":link})
-            }
-          })
-        }
-        */
-      }else{
-        var fullFilePath = `${this.savedPath}${this.getExtensionId()}.json`
-        if(fs.existsSync(fullFilePath)){
-          fs.unlinkSync(fullFilePath)
-        }
-        var fileContent = JSON.stringify(this.callRecords)
-        try{
-          fs.writeFileSync('./'+ fullNamePath, fileContent)
-
-          var zipFile = "CallLog_"+this.getExtensionId() + ".zip"
-          zipper.sync.zip("./"+this.savedPath).compress().save(zipFile);
-
-          var link = "/downloads?filename=" + zipFile
-          res.send({"status":"ok","message":link})
-          /*
-          console.log("unlink")
-          var jsonFile = `${this.savedPath}${this.getExtensionId()}.json`
-          if (fs.existsSync(jsonFile))
-            fs.unlinkSync(jsonFile)
-
-          var recordingPath = `${this.savedPath}recordings`
-          if (fs.existsSync(recordingPath)) {
-            fs.readdirSync(recordingPath).forEach((file, index) => {
-              const curPath = Path.join(recordingPath, file);
-              fs.unlinkSync(curPath);
-            });
-          }
-          */
-        }catch (e){
-          console.log("cannot create download file")
-          res.send({"status":"failed","message":"Cannot create a call log file! Please try gain"})
-        }
       }
     },
     deleteCallLogZipFile: function(res){
@@ -1391,19 +1175,9 @@ var engine = User.prototype = {
             if (error) {
               console.log('Something is wrong!');
             }
-            /*
-            thisUser.extIndex++
-            if (thisUser.extIndex < extList.length){
-              setTimeout(function(){
-                thisUser.readExtensionCallLog(body, extList, res)
-              }, 1000)
-              */
-            //}else{
-              console.log('Done download atachments!');
-              thisUser.readReport.readInProgress = false
-              thisUser.readReport.readInfo =  "Reading done!"
-
-            //}
+            console.log('Done download atachments!');
+            thisUser.readReport.readInProgress = false
+            thisUser.readReport.readInfo =  "Reading done!"
         });
     },
     _dl_function: function(p, dir, recordingUrlList) {
@@ -1424,154 +1198,6 @@ var engine = User.prototype = {
           function (err){
             return callback (null, "");
           })
-       }
-    },
-    readExtensionCallLog: function(body, extList, res){
-      var ext = extList[this.extIndex]
-      var endpoint = '/account/~/extension/'+ ext.id +'/call-log'
-      var thisBody = body
-      var thisRes = res
-      var thisUser = this
-
-      var params = {
-        view: "Detailed",
-        dateFrom: body.dateFrom,
-        dateTo: body.dateTo,
-        showBlocked: true,
-        perPage: 1000
-      }
-
-      var p = thisUser.rc_platform.getPlatform()
-      var table = thisUser.getUserTable()
-
-      var companyPhoneNumber = thisUser.getMainCompanyNumber()
-
-      async.waterfall([
-          this._function(p, res, endpoint, params, table, companyPhoneNumber, extList, ext.id)
-        ], function (error, success) {
-            if (error) {
-              console.log('Something is wrong!');
-            }
-            thisUser.extIndex++
-            if (thisUser.extIndex < extList.length){
-              setTimeout(function(){
-                thisUser.readExtensionCallLog(body, extList, res)
-              }, 1000)
-            }else{
-              console.log('Done read call log!');
-              thisUser.extIndex = 0
-              thisRes.send('{"status":"ok"}')
-            }
-        });
-    },
-    _function: function(p, res, endpoint, params, table, companyPhoneNumber, extensionList, extensionId) {
-      var thisRes = res
-      return function (callback) {
-        p.get(endpoint, params)
-          .then(function(resp){
-            var json = resp.json()
-            //console.log("REC LEN: " + json.records.length)
-            if (json.records.length == 0){
-              return callback (null, json);
-            }
-            async.each(json.records,
-              function(record, callback0){
-                //console.log("RECORD: " + JSON.stringify(record))
-                var item = {}
-                if (record.hasOwnProperty("message") && record.message.type == "VoiceMail"){
-                  item['call_type'] = "VM"
-                  item['uid'] = record.message.id
-                  var recordingUrl = record.message.uri.replace("platform", "media")
-                  recordingUrl += "/content/" + record.message.id
-                  item['recording_url'] = recordingUrl
-                }else if (record.hasOwnProperty("recording")){
-                  item['call_type'] = "CR"
-                  item['uid'] = record.recording.id
-                  item['recording_url'] = record.recording.contentUri
-                }else {
-                  //console.log("NO CR/VM")
-                  return callback0(null, null)
-                }
-                // CR and VM has the same 'from' and 'to' data structure
-                if (record.hasOwnProperty('to')){
-                  if (record.to.hasOwnProperty('phoneNumber'))
-                    item['to_number'] = record.to.phoneNumber
-                  else if (record.to.hasOwnProperty('extensionNumber'))
-                    item['to_number'] = companyPhoneNumber + "*" + record.to.extensionNumber
-                  else
-                    item['to_number'] = "Unknown #"
-                  if (record.to.hasOwnProperty('name'))
-                    item['to_name'] = record.to.name
-                  else
-                    item['to_name'] = "Unknown"
-                }else{
-                  item['to_number'] = "Unknown #"
-                  item['to_name'] = "Unknown"
-                }
-
-                if (record.hasOwnProperty('from')){
-                  if (record.from.hasOwnProperty('phoneNumber'))
-                    item['from_number'] = record.from.phoneNumber
-                  else if (record.from.hasOwnProperty('extensionNumber'))
-                    item['from_number'] = companyPhoneNumber + "*" + record.from.extensionNumber
-                  else
-                    item['from_number'] = "Unknown #"
-                  if (record.from.hasOwnProperty('name'))
-                    item['from_name'] = record.from.name
-                  else
-                    item['from_name'] = "Unknown"
-                }else{
-                  item['from_number'] = "Unknown #"
-                  item['from_name'] = "Unknown"
-                }
-                item['call_date'] = new Date(record.startTime).getTime() - (8*3600*1000)
-                item['processed'] = false
-                item['rec_id'] = record.id
-                item['duration'] = record.duration
-                item['direction'] = (record.direction == "Inbound") ? "In" : "out"
-                item['extension_id'] = extensionId
-                for (var ext of extensionList){
-                  for (var leg of record.legs){
-                    if (leg.hasOwnProperty('extension')){
-                      if (ext.id == leg.extension.id){
-                        item['extension_num'] = ext.extNum
-                        item['full_name'] = ext.fullName
-                        break
-                      }
-                      break
-                    }
-                  }
-                }
-                //console.log(JSON.stringify(item))
-                var query = "INSERT INTO " + table
-                query += "(uid, rec_id, call_date, call_type, extension_id, extension_num, full_name, from_number, from_name, to_number, to_name, recording_url, duration, direction, processed, wordsandoffsets, transcript, conversations, sentiments, sentiment_label, sentiment_score, sentiment_score_hi, sentiment_score_low, has_profanity, profanities, keywords, entities, concepts, categories, actions, subject)"
-                query += " VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27,$28,$29,$30,$31)"
-                var values = [item['uid'], item['rec_id'],item['call_date'],item['call_type'],item['extension_id'],item['extension_num'],item['full_name'],item['from_number'],item['from_name'],item['to_number'],item['to_name'],item['recording_url'],item['duration'],item['direction'],0,"","","","","",0,0,0,0,"","","","","","",""]
-                query += " ON CONFLICT DO NOTHING"
-                pgdb.insert(query, values, (err, result) =>  {
-                  if (err)
-                    console.error("INSERT ERR: " + err.message);
-                  // create index
-                  var q = "CREATE INDEX " + table + "_fts_ind ON " + table + " USING gin (to_tsvector('simple', string))"
-                  return callback0(null, result)
-                })
-              },
-              function (err){
-                return callback (null, json);
-              })
-            })
-            .catch(function(e){
-              var errorRes = {}
-              var err = e.toString();
-              if (err.includes("ReadCompanyCallLog")){
-                errorRes['calllog_error'] = "You do not have admin role to access account level. You can choose the extension access level."
-                thisRes.send(JSON.stringify(errorRes))
-              }else{
-                errorRes['calllog_error'] = "Cannot access call log."
-                thisRes.send(JSON.stringify(errorRes))
-              }
-              console.log(err)
-            })
        }
     },
     logout: function(req, res, callback){
