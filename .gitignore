@@ -12,3 +12,4 @@ downloads/
 .env
 *.zip
 *-token.js
+*-old.js

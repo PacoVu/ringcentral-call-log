@@ -34,6 +34,8 @@ function User(id, mode) {
   this.mainCompanyNumber = ""
   this.csvContent = ""
   this.appendFile = false
+  this.fileIndex = 0
+  this.rowsCount = 0
   this.recordingUrls = []
   this.voicemailUrls = []
   this.attachmentUrls = []
@@ -269,6 +271,8 @@ var engine = User.prototype = {
       this.readReport.status = "ok"
       this.csvContent = null
       this.maxBlock = 0
+      this.fileIndex = 1
+      this.rowsCount = 0
       this.appendFile = false
       this.attachmentUrls = []
 
@@ -429,14 +433,34 @@ var engine = User.prototype = {
               thisUser.readReport.readInfo =  "Reading page " + jsonObj.paging.page
               thisUser.readReport.recordsCount += jsonObj.records.length
               thisUser.parseCallRecords(p, jsonObj.records)
-              var jsonObj = resp.response().headers
-              var limit = parseInt(jsonObj['_headers']['x-rate-limit-limit'][0])
-              var limitRemaining = parseInt(jsonObj['_headers']['x-rate-limit-remaining'][0])
-              var limitWindow = parseInt(jsonObj['_headers']['x-rate-limit-window'][0])
+              var jsonHeader = resp.response().headers
+              var limit = parseInt(jsonHeader['_headers']['x-rate-limit-limit'][0])
+              var limitRemaining = parseInt(jsonHeader['_headers']['x-rate-limit-remaining'][0])
+              var limitWindow = parseInt(jsonHeader['_headers']['x-rate-limit-window'][0])
               console.log("limitRemaining: " + limitRemaining)
-              var navigationObj = resp.json().navigation
 
-              if (navigationObj.hasOwnProperty("nextPage")){
+              var hasNextPage = jsonObj.navigation.hasOwnProperty("nextPage")
+              var nextPageUri = ""
+              if (hasNextPage)
+                nextPageUri = jsonObj.navigation.nextPage.uri
+
+              var pro = process.memoryUsage()
+              console.log("Before Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
+              thisUser.csvContent = null
+              resp = null
+              try {
+                if (global.gc) {
+                  console.log("calling gc")
+                  global.gc();
+                }
+              } catch (e) {
+                console.log("`node --expose-gc index.js`");
+                //process.exit();
+              }
+              var pro = process.memoryUsage()
+              console.log("After Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
+
+              if (hasNextPage){
                 var delayInterval = 100
                 if (limitRemaining == 0){
                     console.log("No remaining => calculate waiting time")
@@ -445,30 +469,16 @@ var engine = User.prototype = {
                     delayInterval = (limitWindow / limit) * 1000
                     thisUser.startTime = now + delayInterval
                 }
-                var pro = process.memoryUsage()
-                console.log("Before Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
-                jsonObj = null
-                try {
-                  if (global.gc) {
-                    console.log("calling gc")
-                    global.gc();
-                  }
-                } catch (e) {
-                  console.log("`node --expose-gc index.js`");
-                  //process.exit();
-                }
-                var pro = process.memoryUsage()
-                console.log("After Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
+                //var nextPageUri = navigationObj.nextPage.uri
+                //navigationObj = null
                 console.log("Read next page after " + delayInterval + " milliseconds")
-                var nextPageUri = navigationObj.nextPage.uri
                 setTimeout(function(){
                   thisUser.readCallLogNextPage(nextPageUri)
                 }, delayInterval, nextPageUri)
               }else{
                 //thisUser.downloadAttachements(p)
                 thisUser.readReport.readInProgress = false
-                thisUser.csvContent = null
-                jsonObj = null
+
                 if (thisUser.readReport.downloadCount == thisUser.readReport.attachmentCount){
                   console.log("all files are downloaded")
                   thisUser.downloadBinaryInProgress = false
@@ -512,33 +522,6 @@ var engine = User.prototype = {
         }
       })
     },
-    parseCallRecords_no_download: function(p, records){
-      for (var record of records) {
-          this.detailedCSVFormat()
-          if (record.hasOwnProperty("message")){
-            if (record.message.type == "VoiceMail"){
-              var voicemailUri = record.message.uri.replace("platform", "media")
-              var fileName = record.message.id + '.mp3'
-              var item = {
-                fileName: record.message.id + '.mp3',
-                url: voicemailUri
-              }
-              this.voicemailUrls.push(item)
-            }else if (record.message.type == "Fax"){
-              var messageUri = record.message.uri
-              this.attachmentUrls.push(messageUri)
-            }
-          }else if (record.hasOwnProperty("recording")){
-            // download binary content to local file
-            var fileName = record.recording.id + '.mp3'
-            var item = {
-              fileName: record.recording.id + '.mp3',
-              url: voicemailUri
-            }
-            this.recordingUrls.push(item)
-          }
-      }
-    },
     parseCallRecords: function(p, records){
       var thisUser = this
       //this.timing = new Date().getTime()
@@ -581,31 +564,36 @@ var engine = User.prototype = {
           callback(null, null)
         },
         function (err){
-          if (thisUser.maxBlock > 0){
-            console.log(`Done read block = Write ${thisUser.maxBlock} records to file`)
-            var fullFilePath = `${thisUser.savedPath}${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.csv`
-            if (thisUser.appendFile == false){
-              thisUser.appendFile = true
-              try{
-                fs.writeFileSync(fullFilePath, thisUser.csvContent)
-              }catch(e){
-                console.log("Write file error " + e)
-              }
-            }else{
-              try{
-                fs.appendFileSync(fullFilePath, thisUser.csvContent)
-              }catch(e){
-                console.log("Append file error " + e)
-              }
+          //if (thisUser.maxBlock > 0){
+          //  console.log(`Done read block = Write ${thisUser.maxBlock} records to file`)
+          console.log(`Done read block = Write 1000 records to file`)
+          var fullFilePath = `${thisUser.savedPath}${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}-${thisUser.fileIndex}.csv`
+          if (thisUser.appendFile == false){
+            thisUser.appendFile = true
+            try{
+              fs.writeFileSync(fullFilePath, thisUser.csvContent)
+            }catch(e){
+              console.log("Write file error " + e)
+            }
+          }else{
+            try{
+              fs.appendFileSync(fullFilePath, thisUser.csvContent)
+            }catch(e){
+              console.log("Append file error " + e)
             }
           }
-          thisUser.maxBlock = 0
+          if (thisUser.rowsCount > 100000){
+            thisUser.fileIndex++
+            thisUser.appendFile = false
+            thisUser.rowsCount = 0
+          }
+          //thisUser.maxBlock = 0
           thisUser.csvContent = null
+          //records = null
           var now = new Date().getTime()
           now = (now - thisUser.timing)/1000
           thisUser.readReport.timeElapse = formatDurationTime(now)
           console.log("Time elapse: " + formatDurationTime(now))
-          records = null
           return
         }
       )
@@ -680,7 +668,8 @@ var engine = User.prototype = {
       this.csvContent += "," + attachment
 
       this.readReport.rowsCount++
-
+      this.rowsCount++
+      /*
       this.maxBlock++
       if (this.maxBlock >= 1000){
         console.log(`Interim write ${this.maxBlock} records to file`)
@@ -696,6 +685,7 @@ var engine = User.prototype = {
         this.csvContent = null
         this.maxBlock = 0
       }
+      */
     },
     detailedCSVFormat: function(record, attachment){
       //console.log(JSON.stringify(record))
@@ -709,6 +699,7 @@ var engine = User.prototype = {
       //  console.log(JSON.stringify(record))
       for (var item of record.legs){
         this.readReport.rowsCount++
+        this.rowsCount++
         if (item.hasOwnProperty('master')){
           var master = {
             Type: item.type,
@@ -952,6 +943,8 @@ var engine = User.prototype = {
       this.csvContent += `,${attachment}`
 
       this.csvContent += legs
+      master = null
+      /*
       this.maxBlock++
       if (this.maxBlock >= 1000){
         console.log(`Interim write ${this.maxBlock} records to file`)
@@ -968,6 +961,7 @@ var engine = User.prototype = {
         this.maxBlock = 0
         master = null
       }
+      */
     },
     // not use
     detailedCSVFormat_old: function(record, attachment){
