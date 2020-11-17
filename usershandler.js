@@ -183,13 +183,19 @@ var engine = User.prototype = {
               var extensionList = []
               for (var record of jsonObj.records){
                 var site = {name: `Ext. Num: ${record.extensionNumber}`, code: `Ext. Id: ${record.id}`}
-                if (record.hasOwnProperty('site'))
-                  site = record.site
-                var name = record.hasOwnProperty('contact') ? `${record.contact.firstName} ${record.contact.lastName}` : "Unknown"
+                if (record.hasOwnProperty('site')){
+                  site.name = (record.site.hasOwnProperty('name')) ? record.site.name : site.name
+                  site.code = (record.site.hasOwnProperty('code')) ? record.site.code : site.code
+                }
+                var name = "Unknown"
+                if (record.hasOwnProperty('contact')){
+                  name = (record.contact.hasOwnProperty('firstName')) ? record.contact.firstName : ""
+                  name += (record.contact.hasOwnProperty('lastName')) ? ` ${record.contact.lastName}` : ""
+                }
                 var item = {
                   id: record.id,
                   name: `${record.extensionNumber} - ${name}`,
-                  site: site
+                  site: `${site.name} - ${site.code}`
                 }
                 //item['id'] = record.id,
                 //item['name'] =`${record.extensionNumber} - ${record.contact.firstName} ${record.contact.lastName}`
@@ -203,7 +209,7 @@ var engine = User.prototype = {
                 console.log("COMPLETE getAccountExtensions")
                 //for (var item of thisUser.extensionList)
                 //  console.log(item.id)
-                console.log(thisUser.extensionList.length)
+                console.log("Extensions: " + thisUser.extensionList.length)
                 callback(null, "readAccountExtensions: DONE")
               }
             })
@@ -677,7 +683,7 @@ var engine = User.prototype = {
       this.readReport.rowsCount++
 
       this.maxBlock++
-      if (this.maxBlock >= 500){
+      if (this.maxBlock >= 1000){
         console.log(`Interim write ${this.maxBlock} records to file`)
         var fullFilePath = `${this.savedPath}${this.lastReadDateRange}_${this.getExtensionId()}.csv`
         if (this.appendFile == false){
@@ -730,9 +736,6 @@ var engine = User.prototype = {
 
           if (item.direction == "Outbound"){
             master.Direction = "Outgoing"
-            if (item.hasOwnProperty('extension')){
-
-            }
             // from
             if (item.hasOwnProperty('from')){
               var temp = (item.from.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.from.phoneNumber) : ""
@@ -775,7 +778,7 @@ var engine = User.prototype = {
               if (extObj.hasOwnProperty('site')){
                 //site = (extObj.site.hasOwnProperty('name')) ? extObj.site.name : ""
                 //site +=  " - " + extObj.site.code
-                master.Site = `${extObj.site.name} - ${extObj.site.code}`
+                master.Site = extObj.site
               }
             }else{
               console.log("CANNOT FIND EXTENSION FROM EXT LIST???? " + item.extension.id)
@@ -834,28 +837,8 @@ var engine = User.prototype = {
           if (item.direction == "Outbound"){
             legs += ",Outgoing"
             // from
-            /*
-            if (item.hasOwnProperty('from')){
-              var temp = (item.from.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.from.phoneNumber) : ""
-              if (temp == "")
-                temp = (item.from.hasOwnProperty('extensionNumber')) ? item.from.extensionNumber : ""
-              legs += "," +  temp
-            }else{
-              legs += ","
-            }
-            */
             legs += ","
             // to
-            /*
-            if (item.hasOwnProperty('to')){
-              var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
-              if (temp == "")
-                temp = (item.to.hasOwnProperty('extensionNumber')) ? item.to.extensionNumber : ""
-              legs += "," +  temp
-            }else{
-              legs += ","
-            }
-            */
             legs += ","
           }else{
             legs += ",Incoming"
@@ -887,14 +870,14 @@ var engine = User.prototype = {
           if (item.hasOwnProperty('extension')){
             var extObj = this.extensionList.find(o => o.id === item.extension.id)
             if (extObj){
-              firstExtension = (firstExtension == "") ? extObj.name : ""
+              //firstExtension = (firstExtension == "") ? extObj.name : ""
               legs += "," + extObj.name
               if (extObj.hasOwnProperty('site')){
                 //site = (extObj.site.hasOwnProperty('name')) ? extObj.site.name : ""
                 //site +=  " - " + extObj.site.code
-                site = `${extObj.site.name} - ${extObj.site.code}`
-                if (masterSite == "-")
-                  masterSite = site
+                site = extObj.site
+                //if (masterSite == "-")
+                //  masterSite = site
               }
             }else{
               legs += ","
@@ -955,7 +938,7 @@ var engine = User.prototype = {
       this.csvContent += `,${master.Direction}`
       this.csvContent += `,${master.From}`
       this.csvContent += `,${master.To}`
-      this.csvContent += (master.Extension == "") ? `,${firstExtension}` : `,${master.Extension}`
+      this.csvContent += `,${master.Extension}` // (master.Extension == "") ? `,${firstExtension}` :
       this.csvContent += `,${master.Forwarded_To}`
       this.csvContent += `,"${master.Name}"`
       this.csvContent += `,${master.Date}`
@@ -966,12 +949,12 @@ var engine = User.prototype = {
       this.csvContent += `,${master.Duration}`
       this.csvContent += `,${master.Included}`
       this.csvContent += `,${master.Purchased}`
-      this.csvContent += (master.Site == "") ? `,${masterSite}` : `,${master.Site}`
+      this.csvContent += `,${master.Site}` // (master.Site == "") ? `,${masterSite}` :
       this.csvContent += `,${attachment}`
 
       this.csvContent += legs
       this.maxBlock++
-      if (this.maxBlock >= 500){
+      if (this.maxBlock >= 1000){
         console.log(`Interim write ${this.maxBlock} records to file`)
         var fullFilePath = `${this.savedPath}${this.lastReadDateRange}_${this.getExtensionId()}.csv`
         if (this.appendFile == false){
@@ -988,10 +971,9 @@ var engine = User.prototype = {
       }
     },
     // not use
-    /*
     detailedCSVFormat_old: function(record, attachment){
       //console.log(JSON.stringify(record))
-      if (this.csvContent == "")
+      if (this.csvContent == null && this.appendFile == false)
         this.csvContent = '"Type","CallId","SessionId","Leg","Direction","From","To","Extension","Forwarded To","Name","Date","Time","Action","Action Result","Result Description","Duration","Included","Purchased","Site","Attachment"'
       var i = 1
       var legs = ""
@@ -1117,8 +1099,22 @@ var engine = User.prototype = {
         this.csvContent += "," + site
         this.csvContent += "," + attachment
       }
+      this.maxBlock++
+      if (this.maxBlock >= 500){
+        console.log(`Interim write ${this.maxBlock} records to file`)
+        var fullFilePath = `${this.savedPath}${this.lastReadDateRange}_${this.getExtensionId()}.csv`
+        if (this.appendFile == false){
+          this.appendFile = true
+          fs.writeFileSync(fullFilePath, this.csvContent)
+          //this.csvContent = ""
+        }else{
+          fs.appendFileSync(fullFilePath, this.csvContent)
+          //this.csvContent = ""
+        }
+        this.csvContent = null
+        this.maxBlock = 0
+      }
     },
-    */
     saveBinaryFile: function(p, type, fileName, contentUri){
       console.log("saveBinaryFile")
       var dir = this.savedPath + type + "/"
