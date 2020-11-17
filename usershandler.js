@@ -29,7 +29,6 @@ function User(id, mode) {
     view:"Simple",
     dateFrom: "",
     dateTo:"",
-    perPage: 500,
     attachments: []
   }
   this.mainCompanyNumber = ""
@@ -256,7 +255,7 @@ var engine = User.prototype = {
         dateFrom: req.body.dateFrom,
         dateTo: req.body.dateTo,
         showBlocked: true,
-        perPage: parseInt(req.body.perpage)
+        perPage: 1000
       }
 
       // return and poll for result

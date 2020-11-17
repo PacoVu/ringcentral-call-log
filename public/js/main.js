@@ -27,11 +27,9 @@ function retrieveDownloadFile(){
     }
     if (res.readReport.readInProgress || res.readReport.downloadBinaryInProgress){
       // set params before disable it
-      $( "#fromdatepicker" ).datepicker('setDate', res.readParams.dateFrom.split("T")[0]);
-      $( "#todatepicker" ).datepicker('setDate', res.readParams.dateTo.split("T")[0]);
-      $("#view").val(res.readParams.view).change();
-      $("#perpage").val(res.readParams.perPage).change();
-
+      $( "#fromdatepicker" ).datepicker('setDate', res.readParams.dateFrom.split("T")[0])
+      $( "#todatepicker" ).datepicker('setDate', res.readParams.dateTo.split("T")[0])
+      $("#view").val(res.readParams.view).change()
       disableInputs(true)
       window.setTimeout(function(){
           pollResult()
@@ -51,7 +49,6 @@ function readCallLogs(){
     configs['extensionList'] = [];
   }
   configs['view'] = $("#view").val()
-  configs['perpage'] = $("#perpage").val()
   configs['attachments'] = JSON.stringify($('#attachments').val());
   configs['timeOffset'] = timeOffset
   //return alert (JSON.stringify(configs))
