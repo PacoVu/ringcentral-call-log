@@ -582,7 +582,7 @@ var engine = User.prototype = {
               console.log("Append file error " + e)
             }
           }
-          if (thisUser.rowsCount > 100000){
+          if (thisUser.rowsCount > 900000){
             thisUser.fileIndex++
             thisUser.appendFile = false
             thisUser.rowsCount = 0
