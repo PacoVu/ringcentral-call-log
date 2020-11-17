@@ -382,6 +382,8 @@ var engine = User.prototype = {
                     }
                     jsonObj = null
                     zipper = null
+                    var pro = process.memoryUsage()
+                    console.log("Final Before Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
                     try {
                       if (global.gc) {
                         global.gc();
@@ -389,6 +391,8 @@ var engine = User.prototype = {
                     } catch (e) {
                       console.log("`node --expose-gc index.js`");
                     }
+                    var pro = process.memoryUsage()
+                    console.log("Final After Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
                   }
                   thisUser.readReport.readInfo =  "Reading done!"
                 }
@@ -479,6 +483,8 @@ var engine = User.prototype = {
                     });
                   }
                   zipper = null
+                  var pro = process.memoryUsage()
+                  console.log("Final Before Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
                   try {
                     if (global.gc) {
                       global.gc();
@@ -486,6 +492,8 @@ var engine = User.prototype = {
                   } catch (e) {
                     console.log("`node --expose-gc index.js`");
                   }
+                  var pro = process.memoryUsage()
+                  console.log("Final After Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
                 }
                 thisUser.readReport.readInfo =  "Reading done!"
               }
@@ -722,7 +730,9 @@ var engine = User.prototype = {
 
           if (item.direction == "Outbound"){
             master.Direction = "Outgoing"
+            if (item.hasOwnProperty('extension')){
 
+            }
             // from
             if (item.hasOwnProperty('from')){
               var temp = (item.from.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.from.phoneNumber) : ""
@@ -945,7 +955,7 @@ var engine = User.prototype = {
       this.csvContent += `,${master.Direction}`
       this.csvContent += `,${master.From}`
       this.csvContent += `,${master.To}`
-      this.csvContent += `,${firstExtension}`
+      this.csvContent += (master.Extension == "") ? `,${firstExtension}` : `,${master.Extension}`
       this.csvContent += `,${master.Forwarded_To}`
       this.csvContent += `,"${master.Name}"`
       this.csvContent += `,${master.Date}`
@@ -956,7 +966,7 @@ var engine = User.prototype = {
       this.csvContent += `,${master.Duration}`
       this.csvContent += `,${master.Included}`
       this.csvContent += `,${master.Purchased}`
-      this.csvContent += `,${masterSite}`
+      this.csvContent += (master.Site == "") ? `,${masterSite}` : `,${master.Site}`
       this.csvContent += `,${attachment}`
 
       this.csvContent += legs
