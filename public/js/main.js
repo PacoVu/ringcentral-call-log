@@ -90,8 +90,8 @@ function pollResult(){
       $("#rows-count").html("Write " + res.rowsCount + " rows.")
       $("#attachments-count").html("Download " + res.attachmentCount + " attachments." )
     }else{
-      alert(res.readInfo)
-      logout()
+      console.log(res.readInfo)
+      //logout()
     }
   });
 }

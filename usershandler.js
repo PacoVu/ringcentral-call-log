@@ -14,6 +14,8 @@ function User(id, mode) {
   this.isAdmin = false
   this.extensionList = []
   this.startTime = 0
+  this.hasNextPage = false
+  this.noCSV = false
   this.readReport = {
     status: "ok",
     readInProgress: false,
@@ -45,7 +47,7 @@ function User(id, mode) {
   this.viewMode = "Simple"
   this.attachments = []
   this.downloadLink = ""
-  this.maxBlock = 0
+
   this.downloadRecording = false
   this.downloadVoicemail = false
   this.download.attachment = false
@@ -164,7 +166,7 @@ var engine = User.prototype = {
     //getAccountExtensions: function (uri){
       var endpoint = '/account/~/extension'
       var params = {
-          //status: "Enabled",
+          //status: ["Enabled","Disabled","NotActivated"],
           //type: "User",
           perPage: 1000
       }
@@ -237,6 +239,10 @@ var engine = User.prototype = {
     readAccountCallLog: function(req, res){
       var thisUser = this
       this.viewMode = req.body.view
+      if (this.viewMode == 'None'){
+        this.viewMode = 'Simple'
+        this.noCSV = true
+      }
       this.timeOffset = parseInt(req.body.timeOffset)
       //console.log(this.timeOffset)
       var attachments = JSON.parse(req.body.attachments)
@@ -253,7 +259,7 @@ var engine = User.prototype = {
       }
 
       this.readCallLogParams = {
-        view: req.body.view,
+        view: this.viewMode,
         dateFrom: req.body.dateFrom,
         dateTo: req.body.dateTo,
         showBlocked: true,
@@ -262,7 +268,7 @@ var engine = User.prototype = {
 
       // return and poll for result
       this.readReport.readInProgress = true
-      this.downloadBinaryInProgress = false
+      this.readReport.downloadBinaryInProgress = false
       this.readReport.readInfo =  "Reading first page"
       this.readReport.recordsCount = 0
       this.readReport.rowsCount = 0
@@ -270,7 +276,6 @@ var engine = User.prototype = {
       this.readReport.attachmentCount = 0
       this.readReport.status = "ok"
       this.csvContent = null
-      this.maxBlock = 0
       this.fileIndex = 1
       this.rowsCount = 0
       this.appendFile = false
@@ -341,76 +346,63 @@ var engine = User.prototype = {
                 thisUser.readReport.recordsCount = jsonObj.records.length
                 //console.log("Total pages: " + JSON.stringify(jsonObj.paging))
                 //console.log("Total elements: " + jsonObj.paging.totalElements)
-                thisUser.parseCallRecords(p, jsonObj.records)
-/*
-                console.log("Done block = Write to file if something left")
-                if (thisUser.maxBlock > 0){
-                  var fullFilePath = `${thisUser.savedPath}${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.csv`
-                  if (thisUser.appendFile == false){
-                    thisUser.appendFile = true
-                    try{
-                      fs.writeFileSync(fullFilePath, thisUser.csvContent)
-                    }catch(e){
-                      console.log("Write file error " + e)
-                    }
-                  }else{
-                    try{
-                      fs.appendFileSync(fullFilePath, thisUser.csvContent)
-                    }catch(e){
-                      console.log("Append file error " + e)
-                    }
-                  }
-                }
-                thisUser.maxBlock = 0
-                thisUser.csvContent = null
-*/
+                //thisUser.parseCallRecords(p, jsonObj.records)
                 var navigationObj = jsonObj.navigation
-                if (navigationObj.hasOwnProperty("nextPage")){
-                  jsonObj = null
-                  thisUser.readCallLogNextPage(navigationObj.nextPage.uri)
-                }else{
-                  //thisUser.downloadAttachements(p)
-                  thisUser.readReport.readInProgress = false
-                  if (thisUser.readReport.downloadCount == thisUser.readReport.attachmentCount){
-                    console.log("all files are downloaded")
-                    thisUser.downloadBinaryInProgress = false
-                    // make zip file and delete .csv file
-                    var zipFile = `CallLog_${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.zip`
-                    var zipper = require('zip-local');
-                    zipper.sync.zip("./"+thisUser.savedPath).compress().save(zipFile);
-
-                    thisUser.downloadLink = "/downloads?filename=" + zipFile
-                    // delete csv file
-                    if (fs.existsSync(thisUser.savedPath)) {
-                      fs.readdirSync(thisUser.savedPath).forEach((file, index) => {
-                        if (file.indexOf(".csv") > 0){
-                          const fileName = Path.join(thisUser.savedPath, file);
-                          fs.unlinkSync(fileName);
-                        }
-                      });
-                    }
+                thisUser.hasNextPage = navigationObj.hasOwnProperty("nextPage")
+                thisUser.parseCallRecords(p, jsonObj.records, (err, result) => {
+                  if (thisUser.hasNextPage){
                     jsonObj = null
-                    zipper = null
-                    var pro = process.memoryUsage()
-                    console.log("Final Before Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
-                    try {
-                      if (global.gc) {
-                        global.gc();
+                    thisUser.readCallLogNextPage(navigationObj.nextPage.uri)
+                  }else{
+                    //thisUser.downloadAttachements(p)
+                    console.log("readAccountCallLog: END HERE?")
+                    thisUser.readReport.readInProgress = false
+                    thisUser.finalizeDownloadLink()
+                    /*
+                    if (thisUser.readReport.downloadCount == thisUser.readReport.attachmentCount){
+                      console.log("all files are downloaded")
+                      thisUser.readReport.downloadBinaryInProgress = false
+                      // make zip file and delete .csv file
+                      var zipFile = `CallLog_${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.zip`
+                      var zipper = require('zip-local');
+                      zipper.sync.zip("./"+thisUser.savedPath).compress().save(zipFile);
+
+                      thisUser.downloadLink = "/downloads?filename=" + zipFile
+                      console.log("check downloadLink")
+                      console.log(thisUser.downloadLink)
+                      // delete csv file
+                      if (fs.existsSync(thisUser.savedPath)) {
+                        fs.readdirSync(thisUser.savedPath).forEach((file, index) => {
+                          if (file.indexOf(".csv") > 0){
+                            const fileName = Path.join(thisUser.savedPath, file);
+                            fs.unlinkSync(fileName);
+                          }
+                        });
                       }
-                    } catch (e) {
-                      console.log("`node --expose-gc index.js`");
+                      jsonObj = null
+                      zipper = null
+                      var pro = process.memoryUsage()
+                      console.log("Final Before Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
+                      try {
+                        if (global.gc) {
+                          global.gc();
+                        }
+                      } catch (e) {
+                        console.log("`node --expose-gc index.js`");
+                      }
+                      var pro = process.memoryUsage()
+                      console.log("Final After Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
                     }
-                    var pro = process.memoryUsage()
-                    console.log("Final After Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
+                    thisUser.readReport.readInfo =  "Reading done!"
+                    */
                   }
-                  thisUser.readReport.readInfo =  "Reading done!"
-                }
+                })
               })
               .catch(function(e){
                 console.log("readAccountCallLog Failed")
                 console.log(e.message)
                 thisUser.readReport.status = "error"
-                thisUser.downloadBinaryInProgress = false
+                thisUser.readReport.downloadBinaryInProgress = false
                 thisUser.readReport.readInProgress = false
                 thisUser.readReport.readInfo =  "You don't have permission to read this account call log!"
               })
@@ -432,154 +424,167 @@ var engine = User.prototype = {
               thisUser.readReport.readInProgress = true
               thisUser.readReport.readInfo =  "Reading page " + jsonObj.paging.page
               thisUser.readReport.recordsCount += jsonObj.records.length
-              thisUser.parseCallRecords(p, jsonObj.records)
-              var jsonHeader = resp.response().headers
-              var limit = parseInt(jsonHeader['_headers']['x-rate-limit-limit'][0])
-              var limitRemaining = parseInt(jsonHeader['_headers']['x-rate-limit-remaining'][0])
-              var limitWindow = parseInt(jsonHeader['_headers']['x-rate-limit-window'][0])
-              console.log("limitRemaining: " + limitRemaining)
+              //thisUser.parseCallRecords(p, jsonObj.records)
+              thisUser.hasNextPage = jsonObj.navigation.hasOwnProperty("nextPage")
+              thisUser.parseCallRecords(p, jsonObj.records, (err, result) => {
+                console.log("Then come here to continue!")
+                var jsonHeader = resp.response().headers
+                var limit = parseInt(jsonHeader['_headers']['x-rate-limit-limit'][0])
+                var limitRemaining = parseInt(jsonHeader['_headers']['x-rate-limit-remaining'][0])
+                var limitWindow = parseInt(jsonHeader['_headers']['x-rate-limit-window'][0])
+                console.log("limitRemaining: " + limitRemaining)
 
-              var hasNextPage = jsonObj.navigation.hasOwnProperty("nextPage")
-              var nextPageUri = ""
-              if (hasNextPage)
-                nextPageUri = jsonObj.navigation.nextPage.uri
+                var nextPageUri = ""
+                if (thisUser.hasNextPage)
+                  nextPageUri = jsonObj.navigation.nextPage.uri
 
-              var pro = process.memoryUsage()
-              console.log("Before Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
-              thisUser.csvContent = null
-              resp = null
-              try {
-                if (global.gc) {
-                  console.log("calling gc")
-                  global.gc();
-                }
-              } catch (e) {
-                console.log("`node --expose-gc index.js`");
-                //process.exit();
-              }
-              var pro = process.memoryUsage()
-              console.log("After Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
-
-              if (hasNextPage){
-                var delayInterval = 100
-                if (limitRemaining == 0){
-                    console.log("No remaining => calculate waiting time")
-                    var now = Date.now()
-                    var diff = now - thisUser.startTime
-                    delayInterval = (limitWindow / limit) * 1000
-                    thisUser.startTime = now + delayInterval
-                }
-                //var nextPageUri = navigationObj.nextPage.uri
-                //navigationObj = null
-                console.log("Read next page after " + delayInterval + " milliseconds")
-                setTimeout(function(){
-                  thisUser.readCallLogNextPage(nextPageUri)
-                }, delayInterval, nextPageUri)
-              }else{
-                //thisUser.downloadAttachements(p)
-                thisUser.readReport.readInProgress = false
-
-                if (thisUser.readReport.downloadCount == thisUser.readReport.attachmentCount){
-                  console.log("all files are downloaded")
-                  thisUser.downloadBinaryInProgress = false
-                  // make zip file and delete .csv file
-                  var zipFile = `CallLog_${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.zip`
-                  var zipper = require('zip-local');
-                  zipper.sync.zip("./"+thisUser.savedPath).compress().save(zipFile);
-
-                  thisUser.downloadLink = "/downloads?filename=" + zipFile
-                  // delete csv file
-                  if (fs.existsSync(thisUser.savedPath)) {
-                    fs.readdirSync(thisUser.savedPath).forEach((file, index) => {
-                      if (file.indexOf(".csv") > 0){
-                        const fileName = Path.join(thisUser.savedPath, file);
-                        fs.unlinkSync(fileName);
-                      }
-                    });
+                var pro = process.memoryUsage()
+                console.log("Before Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
+                thisUser.csvContent = null
+                resp = null
+                try {
+                  if (global.gc) {
+                    console.log("calling gc")
+                    global.gc();
                   }
-                  zipper = null
-                  var pro = process.memoryUsage()
-                  console.log("Final Before Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
-                  try {
-                    if (global.gc) {
-                      global.gc();
+                } catch (e) {
+                  console.log("`node --expose-gc index.js`");
+                  //process.exit();
+                }
+                var pro = process.memoryUsage()
+                console.log("After Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
+
+                if (thisUser.hasNextPage){
+                  var delayInterval = 100
+                  if (limitRemaining == 0){
+                      console.log("No remaining => calculate waiting time")
+                      var now = Date.now()
+                      var diff = now - thisUser.startTime
+                      delayInterval = (limitWindow / limit) * 1000
+                      thisUser.startTime = now + delayInterval
+                  }
+                  //var nextPageUri = navigationObj.nextPage.uri
+                  //navigationObj = null
+                  console.log("Read next page after " + delayInterval + " milliseconds")
+                  setTimeout(function(){
+                    thisUser.readCallLogNextPage(nextPageUri)
+                  }, delayInterval, nextPageUri)
+                }else{
+                  //thisUser.downloadAttachements(p)
+                  thisUser.readReport.readInProgress = false
+                  console.log(`${thisUser.readReport.downloadCount} == ${thisUser.readReport.attachmentCount}`)
+                  thisUser.finalizeDownloadLink()
+                  /*
+                  if (thisUser.readReport.downloadCount == thisUser.readReport.attachmentCount){
+                    console.log("all files are downloaded HERE?")
+                    thisUser.readReport.downloadBinaryInProgress = false
+                    // make zip file and delete .csv file
+                    var zipFile = `CallLog_${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.zip`
+                    var zipper = require('zip-local');
+                    zipper.sync.zip("./"+thisUser.savedPath).compress().save(zipFile);
+
+                    thisUser.downloadLink = "/downloads?filename=" + zipFile
+                    console.log("check downloadLink nextPage")
+                    console.log(thisUser.downloadLink)
+                    // delete csv file
+                    if (fs.existsSync(thisUser.savedPath)) {
+                      fs.readdirSync(thisUser.savedPath).forEach((file, index) => {
+                        if (file.indexOf(".csv") > 0){
+                          const fileName = Path.join(thisUser.savedPath, file);
+                          fs.unlinkSync(fileName);
+                        }
+                      });
                     }
-                  } catch (e) {
-                    console.log("`node --expose-gc index.js`");
+                    zipper = null
+                    var pro = process.memoryUsage()
+                    console.log("Final Before Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
+                    try {
+                      if (global.gc) {
+                        global.gc();
+                      }
+                    } catch (e) {
+                      console.log("`node --expose-gc index.js`");
+                    }
+                    var pro = process.memoryUsage()
+                    console.log("Final After Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
                   }
-                  var pro = process.memoryUsage()
-                  console.log("Final After Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
+                  thisUser.readReport.readInfo =  "Reading done!"
+                  */
                 }
-                thisUser.readReport.readInfo =  "Reading done!"
-              }
+              })
             })
             .catch(function(e){
               console.log("readCallLogNextPage Failed")
               console.log(e.message)
+              // set error
+              thisUser.readReport.status = "failed"
+              thisUser.readReport.readInfo = e.message
             })
         }else{
           console.log("ERR" + err)
         }
       })
     },
-    parseCallRecords: function(p, records){
+    parseCallRecords: function(p, records, cb){
       var thisUser = this
-      //this.timing = new Date().getTime()
-      async.each(records,
-        function(record, callback){
-          var attachment = "-"
-          if (record.hasOwnProperty("message")){
-            if (record.message.type == "VoiceMail" && thisUser.downloadVoicemail){
-              var voicemailUri = record.message.uri.replace("platform", "media")
-              var fileName = record.message.id + '.mp3'
-              attachment = "voicemail/" + fileName
-              thisUser.readReport.attachmentCount++
-              thisUser.downloadBinaryInProgress = true
-              thisUser.saveBinaryFile(p, "voicemail", fileName, voicemailUri)
-            }else if (record.message.type == "Fax" && thisUser.downloadAttachements){
-              if (record.direction == "Outbound" && record.result == "Sent"){
-                console.log("++++++ Fax Record with Attachments ++++++")
-                /*
-                console.log(JSON.stringify(record))
-                console.log("++++++")
-                var messageUri = record.message.uri
-                //thisUser.readReport.attachmentCount++
-                thisUser.attachmentUrls.push(messageUri)
-                */
+      async.eachSeries(records, function (record, done) {
+          setTimeout(function () {
+              var attachment = "-"
+              if (record.hasOwnProperty("message")){
+                if (record.message.type == "VoiceMail" && thisUser.downloadVoicemail){
+                  var voicemailUri = record.message.uri.replace("platform", "media")
+                  var fileName = record.message.id + '.mp3'
+                  attachment = "voicemail/" + fileName
+                  thisUser.readReport.attachmentCount++
+                  thisUser.readReport.downloadBinaryInProgress = true
+                  thisUser.saveBinaryFile(p, "voicemail", fileName, voicemailUri)
+                }else if (record.message.type == "Fax" && thisUser.downloadAttachements){
+                  if (record.direction == "Outbound" && record.result == "Sent"){
+                    console.log("++++++ Fax Record with Attachments ++++++")
+                    /*
+                    console.log(JSON.stringify(record))
+                    console.log("++++++")
+                    var messageUri = record.message.uri
+                    //thisUser.readReport.attachmentCount++
+                    thisUser.attachmentUrls.push(messageUri)
+                    */
+                  }
+                }
+              }else if (record.hasOwnProperty("recording") && thisUser.downloadRecording){
+                // download binary content to local file
+                var fileName = record.recording.id + '.mp3'
+                attachment = "recordings/" + fileName
+                thisUser.readReport.attachmentCount++
+                thisUser.readReport.downloadBinaryInProgress = true
+                thisUser.saveBinaryFile(p, "recordings", fileName, record.recording.contentUri)
               }
-            }
-          }else if (record.hasOwnProperty("recording") && thisUser.downloadRecording){
-            // download binary content to local file
-            var fileName = record.recording.id + '.mp3'
-            attachment = "recordings/" + fileName
-            thisUser.readReport.attachmentCount++
-            thisUser.downloadBinaryInProgress = true
-            thisUser.saveBinaryFile(p, "recordings", fileName, record.recording.contentUri)
-          }
-          if (thisUser.viewMode == "Simple")
-            thisUser.simpleCSVFormat(record, attachment)
-          else
-            thisUser.detailedCSVFormat(record, attachment)
-          record = null
-          callback(null, null)
-        },
-        function (err){
-          //if (thisUser.maxBlock > 0){
-          //  console.log(`Done read block = Write ${thisUser.maxBlock} records to file`)
+              if (!thisUser.noCSV){
+                if (thisUser.viewMode == "Simple")
+                  thisUser.simpleCSVFormat(record, attachment)
+                else if (thisUser.viewMode == "Detailed")
+                  thisUser.detailedCSVFormat(record, attachment)
+              }
+              record = null
+              done()
+          }, 80);
+      }, function (err) {
+          //if (!err) callback();
           console.log(`Done read block = Write 1000 records to file`)
           var fullFilePath = `${thisUser.savedPath}${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}-${thisUser.fileIndex}.csv`
-          if (thisUser.appendFile == false){
-            thisUser.appendFile = true
-            try{
-              fs.writeFileSync(fullFilePath, thisUser.csvContent)
-            }catch(e){
-              console.log("Write file error " + e)
-            }
-          }else{
-            try{
-              fs.appendFileSync(fullFilePath, thisUser.csvContent)
-            }catch(e){
-              console.log("Append file error " + e)
+          if (!thisUser.noCSV){
+            if (thisUser.appendFile == false){
+              thisUser.appendFile = true
+              try{
+                fs.writeFileSync(fullFilePath, thisUser.csvContent)
+              }catch(e){
+                console.log("Write file error " + e)
+              }
+            }else{
+              try{
+                fs.appendFileSync(fullFilePath, thisUser.csvContent)
+              }catch(e){
+                console.log("Append file error " + e)
+              }
             }
           }
           if (thisUser.rowsCount > 900000){
@@ -587,16 +592,54 @@ var engine = User.prototype = {
             thisUser.appendFile = false
             thisUser.rowsCount = 0
           }
-          //thisUser.maxBlock = 0
           thisUser.csvContent = null
-          //records = null
           var now = new Date().getTime()
           now = (now - thisUser.timing)/1000
           thisUser.readReport.timeElapse = formatDurationTime(now)
           console.log("Time elapse: " + formatDurationTime(now))
+          console.log("Block read DONE!")
+          cb(null, "ok")
+      });
+    },
+    finalizeDownloadLink: function(){
+      console.log("finalizeDownloadLink")
+      var thisUser = this
+      if (thisUser.readReport.downloadCount == thisUser.readReport.attachmentCount){
+        if (thisUser.readReport.readInProgress)
           return
+        console.log("all files are downloaded HERE?")
+        thisUser.readReport.downloadBinaryInProgress = false
+        // make zip file and delete .csv file
+        var zipFile = `CallLog_${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.zip`
+        var zipper = require('zip-local');
+        zipper.sync.zip("./"+thisUser.savedPath).compress().save(zipFile);
+
+        thisUser.downloadLink = "/downloads?filename=" + zipFile
+        console.log("check downloadLink nextPage")
+        console.log(thisUser.downloadLink)
+        // delete csv file
+        if (fs.existsSync(thisUser.savedPath)) {
+          fs.readdirSync(thisUser.savedPath).forEach((file, index) => {
+            if (file.indexOf(".csv") > 0){
+              const fileName = Path.join(thisUser.savedPath, file);
+              fs.unlinkSync(fileName);
+            }
+          });
         }
-      )
+        zipper = null
+        var pro = process.memoryUsage()
+        console.log("Final Before Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
+        try {
+          if (global.gc) {
+            global.gc();
+          }
+        } catch (e) {
+          console.log("`node --expose-gc index.js`");
+        }
+        var pro = process.memoryUsage()
+        console.log("Final After Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
+      }
+      thisUser.readReport.readInfo =  "Reading done!"
     },
     downloadFaxAttachements: function(p){
       var thisUser = this
@@ -669,23 +712,6 @@ var engine = User.prototype = {
 
       this.readReport.rowsCount++
       this.rowsCount++
-      /*
-      this.maxBlock++
-      if (this.maxBlock >= 1000){
-        console.log(`Interim write ${this.maxBlock} records to file`)
-        var fullFilePath = `${this.savedPath}${this.lastReadDateRange}_${this.getExtensionId()}.csv`
-        if (this.appendFile == false){
-          this.appendFile = true
-          fs.writeFileSync(fullFilePath, this.csvContent)
-          //this.csvContent = ""
-        }else{
-          fs.appendFileSync(fullFilePath, this.csvContent)
-          //this.csvContent = ""
-        }
-        this.csvContent = null
-        this.maxBlock = 0
-      }
-      */
     },
     detailedCSVFormat: function(record, attachment){
       //console.log(JSON.stringify(record))
@@ -944,172 +970,9 @@ var engine = User.prototype = {
 
       this.csvContent += legs
       master = null
-      /*
-      this.maxBlock++
-      if (this.maxBlock >= 1000){
-        console.log(`Interim write ${this.maxBlock} records to file`)
-        var fullFilePath = `${this.savedPath}${this.lastReadDateRange}_${this.getExtensionId()}.csv`
-        if (this.appendFile == false){
-          this.appendFile = true
-          fs.writeFileSync(fullFilePath, this.csvContent)
-          //this.csvContent = ""
-        }else{
-          fs.appendFileSync(fullFilePath, this.csvContent)
-          //this.csvContent = ""
-        }
-        this.csvContent = null
-        this.maxBlock = 0
-        master = null
-      }
-      */
-    },
-    // not use
-    detailedCSVFormat_old: function(record, attachment){
-      //console.log(JSON.stringify(record))
-      if (this.csvContent == null && this.appendFile == false)
-        this.csvContent = '"Type","CallId","SessionId","Leg","Direction","From","To","Extension","Forwarded To","Name","Date","Time","Action","Action Result","Result Description","Duration","Included","Purchased","Site","Attachment"'
-      var i = 1
-      var legs = ""
-      for (var item of record.legs){
-        if (item.hasOwnProperty('master')){
-          this.csvContent += "\r\n" + item.type
-          this.csvContent += "," + record.id
-          this.csvContent += `,${record.sessionId.toString()}`
-          this.csvContent += `,Leg-master`
-        }else{
-          this.csvContent += "\r\n"
-          this.csvContent += ","
-          this.csvContent += ","
-          this.csvContent += `,Leg-${i}`
-          i++
-        }
-        if (item.direction == "Outbound"){
-          this.csvContent += ",Outgoing"
-          // from
-          if (item.hasOwnProperty('from')){
-            var temp = (item.from.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.from.phoneNumber) : ""
-            if (temp == "")
-              temp = (item.from.hasOwnProperty('extensionNumber')) ? item.from.extensionNumber : ""
-            this.csvContent += "," +  temp
-          }else{
-            this.csvContent += ","
-          }
-          // to
-          if (item.hasOwnProperty('to')){
-            var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
-            if (temp == "")
-              temp = (item.to.hasOwnProperty('extensionNumber')) ? item.to.extensionNumber : ""
-            this.csvContent += "," +  temp
-          }else{
-            this.csvContent += ","
-          }
-        }else{
-          this.csvContent += ",Incoming"
-          // from
-          if (item.hasOwnProperty('from')){
-            var temp = (item.from.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.from.phoneNumber) : ""
-            if (temp == "")
-              temp = (item.from.hasOwnProperty('extensionNumber')) ? item.from.extensionNumber : ""
-            this.csvContent += "," +  temp
-          }else{
-            this.csvContent += ","
-          }
-          // to
-          if (item.hasOwnProperty('to')){
-            var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
-            if (temp == "")
-              temp = (item.to.hasOwnProperty('extensionNumber')) ? item.to.extensionNumber : ""
-            this.csvContent += "," +  temp
-          }else{
-            this.csvContent += ","
-          }
-        }
-
-        // extension
-        var site = "-"
-        if (item.hasOwnProperty('extension')){
-          var extObj = this.extensionList.find(o => o.id === item.extension.id)
-          if (extObj){
-            //console.log(extObj.name)
-            this.csvContent += "," + extObj.name
-            //console.log(extObj.site)
-            if (extObj.hasOwnProperty('site')){
-              //site = (extObj.site.hasOwnProperty('name')) ? extObj.site.name : ""
-              //site +=  " - " + extObj.site.code
-              site = `${extObj.site.name} - ${extObj.site.code}`
-            }
-          }else{
-            this.csvContent += ","
-          }
-        }else{
-          this.csvContent += ","
-        }
-
-        // Forwarded to
-        if (record.direction == "Inbound" && item.direction == "Outbound"){
-          var temp = (item.to.hasOwnProperty('phoneNumber')) ? formatPhoneNumber(item.to.phoneNumber) : ""
-          this.csvContent += "," + temp
-        }else
-          this.csvContent += ","
-
-        // Name
-        if (item.direction == "Outbound"){
-          var temp = ""
-          if (item.hasOwnProperty('to')){
-            var temp = (item.to.hasOwnProperty('name')) ? item.to.name : ""
-          }
-          this.csvContent += `,"${temp}"`
-        }else{
-          var temp = ""
-          if (item.hasOwnProperty('from')){
-            temp = (item.from.hasOwnProperty('name')) ? item.from.name : ""
-          }
-          this.csvContent += `,"${temp}"`
-        }
-
-        let dateOptions = { weekday: 'short' }
-        let timeOptions = { hour: '2-digit',minute: '2-digit' }
-        var date = new Date(item.startTime)
-        var dateStr = date.toLocaleDateString("en-US", dateOptions)
-        dateStr += " " + date.toLocaleDateString("en-US")
-        this.csvContent += "," + dateStr
-        this.csvContent += "," + date.toLocaleTimeString("en-US")
-        this.csvContent += "," + item.action + "," + item.result
-        var desc = (item.hasOwnProperty('reasonDescription')) ? item.reasonDescription : ""
-        this.csvContent += "," + desc
-        this.csvContent += "," + formatDurationTime(item.duration)
-
-        //if (record.direction == item.direction){
-        //if (item.hasOwnProperty('master')){
-        if (site != "-"){
-          // included
-          this.csvContent += "," + record.billing.costIncluded
-          // purchased
-          this.csvContent += "," + record.billing.costPurchased
-        }else{
-          this.csvContent += ",-,-"
-        }
-        this.csvContent += "," + site
-        this.csvContent += "," + attachment
-      }
-      this.maxBlock++
-      if (this.maxBlock >= 500){
-        console.log(`Interim write ${this.maxBlock} records to file`)
-        var fullFilePath = `${this.savedPath}${this.lastReadDateRange}_${this.getExtensionId()}.csv`
-        if (this.appendFile == false){
-          this.appendFile = true
-          fs.writeFileSync(fullFilePath, this.csvContent)
-          //this.csvContent = ""
-        }else{
-          fs.appendFileSync(fullFilePath, this.csvContent)
-          //this.csvContent = ""
-        }
-        this.csvContent = null
-        this.maxBlock = 0
-      }
     },
     saveBinaryFile: function(p, type, fileName, contentUri){
-      console.log("saveBinaryFile")
+      //console.log("saveBinaryFile")
       var dir = this.savedPath + type + "/"
       if(!fs.existsSync(dir)){
         fs.mkdirSync(dir)
@@ -1120,10 +983,15 @@ var engine = User.prototype = {
       this.download(uri, fullNamePath, function(){
         thisUser.readReport.downloadCount++
         if (thisUser.readReport.downloadCount == thisUser.readReport.attachmentCount){
-          console.log("all files are downloaded: DOWNLOAD")
-          thisUser.downloadBinaryInProgress = false
+          console.log("file downloaded for this page")
+          thisUser.readReport.downloadBinaryInProgress = false
+          if (!thisUser.hasNextPage){
+            thisUser.finalizeDownloadLink()
+          }else{
+            console.log("Has next page => READING NEXT PAGE")
+          }
         }
-        console.log("Save file to the local machine. " + fullNamePath)
+        //console.log("Save file to the local machine. " + fullNamePath)
       })
     },
     download: function(uri, dest, cb) {
@@ -1136,15 +1004,17 @@ var engine = User.prototype = {
       });
     },
     createDownloadLinks: function(res){
+      console.log("createDownloadLinks")
       var thisUser = this
       thisUser.downloadLink = ""
+      //console.log(thisUser.downloadLink)
       var userDownloadFile = `${this.extensionId}.zip`
       //if (fs.existsSync(this.savedPath)) {
         fs.readdirSync(process.cwd()).forEach((file, index) => {
           if (file.indexOf(userDownloadFile) > 0){
             //const fileName = Path.join(this.savedPath, file);
             thisUser.downloadLink = "/downloads?filename=" + file
-            console.log(thisUser.downloadLink)
+            console.log('Download file name: ' + thisUser.downloadLink)
           }
         });
         if (thisUser.downloadLink.length)
@@ -1164,6 +1034,8 @@ var engine = User.prototype = {
       //}
     },
     downloadCallLog: function(req, res){
+      console.log('downloadCallLog')
+      console.log(this.downloadLink)
       if (req.query.format == "CSV"){
         res.send({"status":"ok","message":this.downloadLink})
       }
@@ -1199,7 +1071,7 @@ var engine = User.prototype = {
       return function (callback) {
         async.each(recordingUrlList,
           function(record, callback0){
-            console.log("saveBinaryFile")
+            console.log("_dl_function")
 
             var thisUser = this
             var uri = p.createUrl(record.url, {addToken: true});
