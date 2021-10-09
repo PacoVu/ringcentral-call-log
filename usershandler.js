@@ -983,15 +983,12 @@ var engine = User.prototype = {
       this.download(uri, fullNamePath, function(){
         thisUser.readReport.downloadCount++
         if (thisUser.readReport.downloadCount == thisUser.readReport.attachmentCount){
-          console.log("file downloaded for this page")
+          //console.log("file downloaded for this page")
           thisUser.readReport.downloadBinaryInProgress = false
           if (!thisUser.hasNextPage){
             thisUser.finalizeDownloadLink()
-          }else{
-            console.log("Has next page => READING NEXT PAGE")
           }
         }
-        //console.log("Save file to the local machine. " + fullNamePath)
       })
     },
     download: function(uri, dest, cb) {
