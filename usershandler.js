@@ -349,6 +349,7 @@ var engine = User.prototype = {
                 //thisUser.parseCallRecords(p, jsonObj.records)
                 var navigationObj = jsonObj.navigation
                 thisUser.hasNextPage = navigationObj.hasOwnProperty("nextPage")
+                console.log("downloadRecording: " + thisUser.downloadRecording)
                 thisUser.parseCallRecords(p, jsonObj.records, (err, result) => {
                   if (thisUser.hasNextPage){
                     jsonObj = null
@@ -426,6 +427,7 @@ var engine = User.prototype = {
               thisUser.readReport.recordsCount += jsonObj.records.length
               //thisUser.parseCallRecords(p, jsonObj.records)
               thisUser.hasNextPage = jsonObj.navigation.hasOwnProperty("nextPage")
+              console.log("downloadRecording next page: " + thisUser.downloadRecording)
               thisUser.parseCallRecords(p, jsonObj.records, (err, result) => {
                 console.log("Then come here to continue!")
                 var jsonHeader = resp.response().headers
@@ -554,6 +556,7 @@ var engine = User.prototype = {
                 // download binary content to local file
                 var fileName = record.recording.id + '.mp3'
                 attachment = "recordings/" + fileName
+                console.log(attachment)
                 thisUser.readReport.attachmentCount++
                 thisUser.readReport.downloadBinaryInProgress = true
                 thisUser.saveBinaryFile(p, "recordings", fileName, record.recording.contentUri)
@@ -607,12 +610,13 @@ var engine = User.prototype = {
       if (thisUser.readReport.downloadCount == thisUser.readReport.attachmentCount){
         if (thisUser.readReport.readInProgress)
           return
-        console.log("all files are downloaded HERE?")
+        console.log("all files are downloaded. Making a zip file...")
         thisUser.readReport.downloadBinaryInProgress = false
         // make zip file and delete .csv file
         var zipFile = `CallLog_${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.zip`
         var zipper = require('zip-local');
-        zipper.sync.zip("./"+thisUser.savedPath).compress().save(zipFile);
+        //zipper.sync.zip("./"+thisUser.savedPath).compress().save(zipFile);
+        zipper.sync.zip("./"+thisUser.savedPath).save(zipFile);
 
         thisUser.downloadLink = "/downloads?filename=" + zipFile
         console.log("check downloadLink nextPage")
