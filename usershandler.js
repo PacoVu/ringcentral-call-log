@@ -605,6 +605,86 @@ var engine = User.prototype = {
       });
     },
     finalizeDownloadLink: function(){
+      console.log("finalizeDownloadLink archiver!")
+      var thisUser = this
+      if (thisUser.readReport.downloadCount == thisUser.readReport.attachmentCount){
+        if (thisUser.readReport.readInProgress)
+          return
+        console.log("all files are downloaded. Making a zip file...")
+        thisUser.readReport.downloadBinaryInProgress = false
+        // make zip file and delete .csv file
+        var zipFile = `CallLog_${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.zip`
+        const archiver = require('archiver');
+        // create a file to stream archive data to.
+        var currentPath = process.cwd();
+        const output = fs.createWriteStream(`${currentPath}/${zipFile}`);
+        const archive = archiver('zip', {
+          zlib: { level: 9 } // Sets the compression level.
+        });
+
+        thisUser.downloadLink = `./downloads?filename=${zipFile}`
+        console.log("check downloadLink nextPage")
+        console.log(thisUser.downloadLink)
+
+        output.on('close', function() {
+          console.log(archive.pointer() + ' total bytes');
+          console.log('archiver has been finalized and the output file descriptor has closed.');
+          thisUser.readReport.readInfo =  "Reading done!"
+          // delete csv file
+          if (fs.existsSync(thisUser.savedPath)) {
+            fs.readdirSync(thisUser.savedPath).forEach((file, index) => {
+              if (file.indexOf(".csv") > 0){
+                const fileName = Path.join(thisUser.savedPath, file);
+                fs.unlinkSync(fileName);
+              }
+            });
+          }
+        });
+
+        // This event is fired when the data source is drained no matter what was the data source.
+        // It is not part of this library but rather from the NodeJS Stream API.
+        // @see: https://nodejs.org/api/stream.html#stream_event_end
+        output.on('end', function() {
+          console.log('Data has been drained');
+        });
+
+        // good practice to catch warnings (ie stat failures and other non-blocking errors)
+        archive.on('warning', function(err) {
+          if (err.code === 'ENOENT') {
+            // log warning
+          } else {
+            // throw error
+            console.log("Archiver WARNING")
+          }
+        });
+
+        // good practice to catch this error explicitly
+        archive.on('error', function(err) {
+          throw err;
+        });
+
+        // pipe archive data to the file
+        archive.pipe(output);
+
+        archive.directory(`./${thisUser.savedPath}`, false);
+        archive.finalize();
+
+/*
+        var pro = process.memoryUsage()
+        console.log("Final Before Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
+        try {
+          if (global.gc) {
+            global.gc();
+          }
+        } catch (e) {
+          console.log("`node --expose-gc index.js`");
+        }
+        var pro = process.memoryUsage()
+        console.log("Final After Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
+      }
+*/
+    },
+    finalizeDownloadLink_zipper: function(){
       console.log("finalizeDownloadLink")
       var thisUser = this
       if (thisUser.readReport.downloadCount == thisUser.readReport.attachmentCount){

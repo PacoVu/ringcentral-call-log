@@ -109,6 +109,12 @@ app.get('/oauth2callback', function(req, res){
   router.login(req, res)
 })
 
+app.get('/api/ringcentral/redirect', function(req, res){
+  console.log("callback redirected")
+  router.login(req, res)
+})
+
+
 app.post('/sendfeedback', function (req, res) {
   console.log("sendfeedback")
   router.postFeedbackToGlip(req, res)
