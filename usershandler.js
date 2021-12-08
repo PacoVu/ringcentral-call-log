@@ -668,7 +668,6 @@ var engine = User.prototype = {
 
         archive.directory(`./${thisUser.savedPath}`, false);
         archive.finalize();
-
 /*
         var pro = process.memoryUsage()
         console.log("Final Before Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
@@ -681,8 +680,8 @@ var engine = User.prototype = {
         }
         var pro = process.memoryUsage()
         console.log("Final After Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
-      }
 */
+      }
     },
     finalizeDownloadLink_zipper: function(){
       console.log("finalizeDownloadLink")
