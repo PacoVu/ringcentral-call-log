@@ -128,6 +128,9 @@ var engine = User.prototype = {
           if(!fs.existsSync(this.savedPath)){
             fs.mkdirSync(this.savedPath)
           }
+          if(!fs.existsSync(`message-store/${extensionId}/`)){
+            fs.mkdirSync(`message-store/${extensionId}/`)
+          }
           console.log('logged_in');
           var thisRes = res
           var p = await this.getPlatform()
