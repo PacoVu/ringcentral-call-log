@@ -128,8 +128,8 @@ var engine = User.prototype = {
           if(!fs.existsSync(this.savedPath)){
             fs.mkdirSync(this.savedPath)
           }
-          if(!fs.existsSync(`message-store/${extensionId}/`)){
-            fs.mkdirSync(`message-store/${extensionId}/`)
+          if(!fs.existsSync(`message-store/`)){
+            fs.mkdirSync(`message-store/`)
           }
           console.log('logged_in');
           var thisRes = res
