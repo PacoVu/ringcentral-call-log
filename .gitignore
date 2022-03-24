@@ -13,4 +13,4 @@ downloads/
 *.zip
 *-token.js
 *-old.js
-CallLog*
+CallLog_*
