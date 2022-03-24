@@ -129,7 +129,7 @@ var router = module.exports = {
       return this.forceLogin(req, res)
     }
     var thisObj = this
-    users[index].logout(req, res, function(err, result){
+    users[index].logout(function(err, result){
       users[index] = null
       console.log("user length before: " + users.length)
       users.splice(index, 1);
@@ -165,17 +165,47 @@ var router = module.exports = {
       return this.forceLogin(req, res)
     users[index].loadMainPage(req, res)
   },
+  loadCallLogPage: function(req, res){
+    var index = getUserIndex(req.session.userId)
+    if (index < 0)
+      return this.forceLogin(req, res)
+    users[index].loadCallLogPage(req, res)
+  },
+  loadMessageStorePage: function(req, res){
+    var index = getUserIndex(req.session.userId)
+    if (index < 0)
+      return this.forceLogin(req, res)
+    users[index].loadMessageStorePage(req, res)
+  },
   readAccountCallLog: function(req, res){
     var index = getUserIndex(req.session.userId)
     if (index < 0)
       return this.forceLogin(req, res)
     users[index].readAccountCallLog(req, res)
   },
+  exportMessageStore: function(req, res){
+    var index = getUserIndex(req.session.userId)
+    if (index < 0)
+      return this.forceLogin(req, res)
+    users[index].exportMessageStore(req, res)
+  },
+  createMessageStoreDownloadLinks: function(req, res){
+    var index = getUserIndex(req.session.userId)
+    if (index < 0)
+      return this.forceLogin(req, res)
+    users[index].createMessageStoreDownloadLinks(res)
+  },
   createDownloadLinks: function(req, res){
     var index = getUserIndex(req.session.userId)
     if (index < 0)
       return this.forceLogin(req, res)
     users[index].createDownloadLinks(res)
+  },
+  pollExportResult: function(req, res){
+    var index = getUserIndex(req.session.userId)
+    if (index < 0)
+      return this.forceLogin(req, res)
+    users[index].pollExportResult(res)
   },
   pollReadCallLogResult: function(req, res){
     var index = getUserIndex(req.session.userId)

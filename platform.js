@@ -1,130 +1,92 @@
-var RC = require('ringcentral')
+const RingCentral = require('@ringcentral/sdk').SDK
 var fs = require('fs')
 var async = require("async");
 require('dotenv').load()
 
 
-function RCPlatform(userObj, mode) {
+function RCPlatform(mode) {
   this.token_json = null
+  this.subscriptionId = ""
   this.extensionId = ""
-  this.accountId = ""
-  this.parent = userObj
+
+  var cachePrefix = `user_${this.extensionId}`
   var rcsdk = null
   if (mode == "production"){
-    rcsdk = new RC({
-      server:RC.server.production,
-      appKey: process.env.CLIENT_ID_PROD,
-      appSecret:process.env.CLIENT_SECRET_PROD
-    })
+    rcsdk = new RingCentral({
+          cachePrefix: cachePrefix,
+          server: RingCentral.server.production,
+          clientId: process.env.CLIENT_ID_PROD,
+          clientSecret:process.env.CLIENT_SECRET_PROD,
+          redirectUri: process.env.RC_APP_REDIRECT_URL,
+        })
   }else if (mode == "sandbox"){
-    rcsdk = new RC({
-      server:RC.server.sandbox,
-      appKey: process.env.CLIENT_ID_SB,
-      appSecret:process.env.CLIENT_SECRET_SB
-    })
+    rcsdk = new RingCentral({
+        cachePrefix: cachePrefix,
+        server: RingCentral.server.sandbox,
+        clientId: process.env.CLIENT_ID_SB,
+        clientSecret:process.env.CLIENT_SECRET_SB,
+        redirectUri: process.env.RC_APP_REDIRECT_URL,
+      })
   }
+  
   this.platform = rcsdk.platform()
+
+  this.platform.on(this.platform.events.loginSuccess, this.loginSuccess)
+  this.platform.on(this.platform.events.logoutSuccess, this.logoutSuccess)
+  this.platform.on(this.platform.events.refreshError, this.refreshError)
+
+  var boundFunction = ( async function() {
+      console.log("WONDERFUL")
+      console.log(this.extensionId);
+  }).bind(this);
+  this.platform.on(this.platform.events.refreshSuccess, boundFunction);
+  this.autoRefreshTimer = undefined
   return this
 }
 
 RCPlatform.prototype = {
-  setAccountId: function(accountId){
-    this.accountId = accountId
-  },
-  login: function(code, callback){
-    var thisPlatform = this
-    this.platform.login({
+  login: async function(code){
+    try{
+      var resp = await this.platform.login({
       code: code,
       redirectUri: process.env.RC_APP_REDIRECT_URL
-    })
-    .then(function (token) {
-      var jsonObj = token.json()
-      //console.log("ACCOUNT INFO" + JSON.stringify(jsonObj))
-      var newToken = {}
-      newToken['access_token'] = jsonObj.access_token
-      newToken['expires_in'] = jsonObj.expires_in
-      newToken['token_type'] = jsonObj.token_type
-      newToken['refresh_token'] = jsonObj.refresh_token
-      newToken['refresh_token_expires_in'] = jsonObj.refresh_token_expires_in
-      newToken['login_timestamp'] = Date.now() / 1000
-      //console.log("ACCESS-TOKEN-EXPIRE-IN: " + json.expires_in)
-      //console.log("REFRESH-TOKEN-EXPIRE-IN: " + json.refresh_token_expires_in)
-      thisPlatform.token_json = newToken
-      thisPlatform.extensionId = jsonObj.owner_id
-      return callback(null, jsonObj.owner_id)
-    })
-    .catch(function (e) {
+      })
+
+      var tokenObj = await this.platform.auth().data()
+      this.token_json = tokenObj
+      this.extensionId = tokenObj.owner_id
+      return this.extensionId
+    }catch(e) {
       console.log('PLATFORM LOGIN ERROR ' + e.message || 'Server cannot authorize user');
-      return callback(e, e.message)
-    });
+      return null
+    }
   },
   logout: function(){
     this.platform.logout()
   },
-  getSDKPlatform: function(){
-      return this.platform
-  },
-  getPlatform: function(callback){
-    if (this.platform.loggedIn()){
-        callback(null, this.platform)
-    }else{
-        console.log("BOTH TOKEN TOKENS EXPIRED")
-        console.log("CAN'T REFRESH: " + e.message)
-        callback("Login", null)
-    }
-  },
-  getPlatform_old: function(){
-    var token = this.token_json
-    if (token == null)
-      return this.platform
-    var timestamp = Date.now() / 1000
-    var consumedTime = (timestamp - token.login_timestamp)
-    //console.log("CONSUMED: " + consumedTime)
-    token.login_timestamp = timestamp
-    token.expires_in = token.expires_in - consumedTime
-    if (token.expires_in < 0)
-      token.expires_in = 0
-    token.refresh_token_expires_in = token.refresh_token_expires_in - consumedTime
-    if (token.refresh_token_expires_in < 0)
-      token.refresh_token_expires_in = 0
-    this.token_json = token
-    var thisPlatform = this.platform
-    var data = this.platform.auth().data();
-    data.token_type = token.token_type
-    data.expires_in = token.expires_in
-    data.access_token = token.access_token
-    data.access_token_ttl = 3600
-    data.refresh_token_expires_in = token.refresh_token_expires_in
-    this.platform.auth().setData(data)
-
-    if (this.platform.auth().accessTokenValid()) { // access token is still valid
-      //console.log("ACCESS TOKEN VALID: " + token.expires_in)
-      return this.platform
-    }else if (this.platform.auth().refreshTokenValid()) {
-      // access token expired => check refresh_token
-      //console.log("ACCESS TOKEN EXPIRED: " + token.expires_in)
-      // refresh token
-      this.platform.on(this.platform.events.refreshError, function(e){
-        console.log("CAN'T REFRESF: " + e.message)
-      });
-      this.platform.on(this.platform.events.refreshSuccess, function(e){
-        console.log("REFRESH SUCCESS")
-        var data = thisPlatform.auth().data();
-        token.token_type = data.token_type
-        token.expires_in = data.expires_in
-        token.access_token = data.access_token
-        token.refresh_token_expires_in = data.refresh_token_expires_in
-        token.login_timestamp = Date.now() / 1000
-        //console.log("NEW TOKEN: " + JSON.stringify(token))
-        this.token_json = token
-      });
-      this.platform.refresh()
+  getPlatform: async function(){
+    console.log("getPlatform")
+    if (await this.platform.loggedIn()){
+      console.log("Logged in!")
       return this.platform
     }else{
-      // forceLogin
       console.log("BOTH TOKEN TOKENS EXPIRED")
+      console.log("CAN'T REFRESH")
       return null
     }
+  },
+  getSDKPlatform: function(){
+    return this.platform
+  },
+  loginSuccess: function(e){
+    console.log("Login success")
+  },
+  logoutSuccess: function(e){
+    console.log("logout Success")
+  },
+  refreshError: function(e){
+    console.log("refresh Error")
+    console.log("Error " + e.message)
   }
 }
 

@@ -76,9 +76,28 @@ app.post('/readlogs', function (req, res) {
   router.readAccountCallLog(req, res)
 })
 
+app.post('/export-message-store', function (req, res) {
+  console.log("exportMessageStore - Async")
+  //console.log("SESSION:" + JSON.stringify(req.session))
+  router.exportMessageStore(req, res)
+})
+
+app.get('/export-message-pollresult', function (req, res) {
+  console.log("Polling ...")
+  router.pollExportResult(req, res)
+})
 
 app.get('/about', function (req, res) {
   router.loadAboutPage(req, res)
+})
+
+
+app.get('/export-call-logs', function (req, res) {
+  router.loadCallLogPage(req, res)
+})
+
+app.get('/export-message-store', function (req, res) {
+  router.loadMessageStorePage(req, res)
 })
 
 app.get('/pollresult', function (req, res) {
@@ -102,6 +121,10 @@ app.get('/downloads', function(req, res){
 
 app.get('/retrievedownloadfile', function (req, res) {
   router.createDownloadLinks(req, res)
+})
+
+app.get('/retrieve-message-store-downloadfile', function (req, res) {
+  router.createMessageStoreDownloadLinks(req, res)
 })
 
 app.get('/oauth2callback', function(req, res){

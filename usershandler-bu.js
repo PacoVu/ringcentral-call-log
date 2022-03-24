@@ -1,3 +1,4 @@
+var RC = require('ringcentral')
 var fs = require('fs')
 var https = require('https');
 const Path = require('path');
@@ -31,14 +32,6 @@ function User(id, mode) {
     dateFrom: "",
     dateTo:"",
     attachments: []
-  }
-  this.exportResponse = {
-    status:'ok',
-    taskStatus: "Idle",
-    taskId: '',
-    downloadLink: [],
-    timeElapse: '0:00',
-    downloadFileName: ''
   }
   this.mainCompanyNumber = ""
   this.csvContent = ""
@@ -83,86 +76,171 @@ var engine = User.prototype = {
       return this.rc_platform.getSDKPlatform()
     },
     loadMainPage: function(req, res){
+      //this.readA2PSMSPhoneNumber(res)
+      var extensionList = []
       res.render('main', {
           userName: this.getUserName(),
-          isAdmin: this.isAdmin
+          extensionList: JSON.stringify(extensionList),
+          userLevel: "admin"
       })
-      if (!this.isAdmin){
-        this.logout((err, result) => {
-          console.log("destroy session")
-          req.session.destroy()
-        })
-      }
+
     },
     loadCallLogPage: function(req, res){
-      if (!this.isAdmin){
-        return res.render('main', {
-            userName: this.getUserName(),
-            isAdmin: this.isAdmin
-        })
-      }
+      var extensionList = []
       res.render('calllogs', {
-          userName: this.getUserName()
+          userName: this.getUserName(),
+          extensionList: JSON.stringify(extensionList),
+          userLevel: "admin"
       })
     },
     loadMessageStorePage: function(req, res){
-      if (!this.isAdmin){
-        return res.render('main', {
-            userName: this.getUserName(),
-            isAdmin: this.isAdmin
-        })
-      }
+      var extensionList = []
       res.render('messages', {
-          userName: this.getUserName()
+          userName: this.getUserName(),
+          extensionList: JSON.stringify(extensionList),
+          userLevel: "admin"
       })
     },
-    login: async function(req, res, callback){
+    login: function(req, res, callback){
       var thisReq = req
       if (req.query.code) {
         console.log("CALL LOGIN FROM USER")
-        var extensionId = await this.rc_platform.login(req.query.code)
-        if (extensionId){
-          this.extensionId = extensionId
-          req.session.extensionId = extensionId;
-          this.savedPath = `downloads/${extensionId}/`
-          if(!fs.existsSync(this.savedPath)){
-            fs.mkdirSync(this.savedPath)
-          }
-          console.log('logged_in');
-          var thisRes = res
-          var p = await this.getPlatform()
-          console.log('passed getPlatform');
-          if (p){
-            try {
-              var resp = await p.get('/restapi/v1.0/account/~/extension/~/')
-              var jsonObj = await resp.json();
-              console.log("RC account id", jsonObj.account.id)
-              this.accountId = jsonObj.account.id
-
-              var fullName = (jsonObj.contact.hasOwnProperty("firstName")) ? `${jsonObj.contact.firstName} ` : ""
-              fullName += (jsonObj.contact.hasOwnProperty("lastName")) ? jsonObj.contact.lastName : ""
-              this.setUserName(fullName)
-
-              if (jsonObj.permissions.admin.enabled){
-                this.isAdmin = true
-              }
-              callback(null, extensionId)
-              res.send('login success');
-            }catch(e) {
-                console.log("Failed")
-                console.error(e);
-                callback("error", this.id)
+        var rc_platform = this.rc_platform
+        var thisUser = this
+        rc_platform.login(req.query.code, function (err, extensionId){
+          if (!err){
+            thisUser.setExtensionId(extensionId)
+            req.session.extensionId = extensionId;
+            thisUser.savedPath = `downloads/${extensionId}/`
+            if(!fs.existsSync(thisUser.savedPath)){
+              fs.mkdirSync(thisUser.savedPath)
             }
+            //callback(null, extensionId)
+            //res.send('login success');
+            rc_platform.getPlatform(function(err, p){
+                if (p != null){
+                  p.get('/account/~/extension/~/')
+                    .then(function(response) {
+                      var jsonObj = response.json();
+                      //console.log(JSON.stringify(jsonObj))
+                      thisUser.accountId = jsonObj.account.id
+                      var fullName = (jsonObj.contact.hasOwnProperty("firstName")) ? `${jsonObj.contact.firstName} ` : ""
+                      fullName += (jsonObj.contact.hasOwnProperty("lastName")) ? jsonObj.contact.lastName : ""
+                      thisUser.setUserName(fullName)
+                      thisUser.extensionList = []
+                      if (jsonObj.permissions.admin.enabled){
+                        thisUser.isAdmin = true
+                        //thisUser.getAccountExtensions("")
+
+                        thisUser.getAccountExtensions("", (err, result) =>{
+                          callback(null, extensionId)
+                          res.send('login success');
+                        })
+
+                      }else{
+                        /*
+                        var item = {}
+                        item['id'] = jsonObj.id
+                        item['name'] =`${jsonObj.extensionNumber} - ${fullName}`
+                        thisUser.extensionList.push(item)
+                        */
+                        //thisUser.getAccountExtensions("")
+
+                        thisUser.getAccountExtensions("", (err, result) =>{
+                          callback(null, extensionId)
+                          res.send('login success');
+                        })
+
+                        //callback(null, extensionId)
+                        //res.send('login success');
+                      }
+                    })
+                    .catch(function(e) {
+                      console.log("Failed")
+                      console.error(e);
+                      res.send('login success');
+                      callback("error", e.message)
+                    });
+                }else{
+                  console.log("CANNOT LOGIN")
+                  res.send('login success');
+                  callback("error", thisUser.extensionId)
+                }
+            })
           }else {
-            console.log("Platform error")
+            console.log("USER HANDLER ERROR: " + thisUser.extensionId)
+            res.send('login success');
+            callback("error", thisUser.extensionId)
           }
-        }else{
-          callback("failed", this.id)
-        }
+        })
       } else {
         res.send('No Auth code');
         callback("error", null)
       }
+    },
+    getAccountExtensions: function (uri, callback){
+    //getAccountExtensions: function (uri){
+      var endpoint = '/account/~/extension'
+      var params = {
+          //status: ["Enabled","Disabled","NotActivated"],
+          //type: "User",
+          perPage: 1000
+      }
+
+      if (uri != ""){
+        endpoint = uri
+        params = {}
+      }
+
+      var thisUser = this
+      this.rc_platform.getPlatform(function(err, p){
+        if (p != null){
+          p.get(endpoint, params)
+            .then(function(resp){
+              var jsonObj = resp.json()
+              //console.log(jsonObj)
+              var extensionList = []
+              for (var record of jsonObj.records){
+                var site = {name: `Ext. Num: ${record.extensionNumber}`, code: `Ext. Id: ${record.id}`}
+                if (record.hasOwnProperty('site')){
+                  site.name = (record.site.hasOwnProperty('name')) ? record.site.name : site.name
+                  site.code = (record.site.hasOwnProperty('code')) ? record.site.code : site.code
+                }
+                var name = "Unknown"
+                if (record.hasOwnProperty('contact')){
+                  name = (record.contact.hasOwnProperty('firstName')) ? record.contact.firstName : ""
+                  name += (record.contact.hasOwnProperty('lastName')) ? ` ${record.contact.lastName}` : ""
+                }
+                var item = {
+                  id: record.id,
+                  name: `${record.extensionNumber} - ${name}`,
+                  site: `${site.name} - ${site.code}`
+                }
+                //item['id'] = record.id,
+                //item['name'] =`${record.extensionNumber} - ${record.contact.firstName} ${record.contact.lastName}`
+                thisUser.extensionList.push(item)
+              }
+              if (jsonObj.navigation.hasOwnProperty("nextPage"))
+                thisUser.getAccountExtensions(jsonObj.navigation.nextPage.uri, callback)
+                //thisUser.getAccountExtensions(jsonObj.navigation.nextPage.uri)
+              else{
+                jsonObj = null
+                console.log("COMPLETE getAccountExtensions")
+                //for (var item of thisUser.extensionList)
+                //  console.log(item.id)
+                console.log("Extensions: " + thisUser.extensionList.length)
+                callback(null, "readAccountExtensions: DONE")
+              }
+            })
+            .catch(function(e){
+              console.log(e.message)
+              callback(null, "readAccountExtensions: DONE")
+            })
+        }else{
+          console.log("DONE getAccountExtensions")
+          callback(null, "readAccountExtensions: DONE")
+        }
+      })
     },
     pollReadCallLogResult: function(req, res){
       console.log(this.readReport)
@@ -174,7 +252,7 @@ var engine = User.prototype = {
       */
       res.send(this.readReport)
     },
-    exportMessageStore: async function(req, res){
+    exportMessageStore: function(req, res){
       this.timeOffset = parseInt(req.body.timeOffset)
       //console.log(this.timeOffset)
       var type = JSON.parse(req.body.type)
@@ -188,124 +266,18 @@ var engine = User.prototype = {
         exportMessagesParams['messageType'] = type
       }
       console.log(exportMessagesParams)
-      var p = await this.getPlatform()
-      if (p){
-        try{
-          var endpoint = "/restapi/v1.0/account/~/message-store-report"
-          var resp = await p.post(endpoint, exportMessagesParams)
-      	  var jsonObj = await resp.json()
-          console.log(jsonObj)
-          this.timing = new Date().getTime()
-          this.exportResponse.status = 'ok'
-          this.exportResponse.taskStatus = jsonObj.status
-          this.exportResponse.taskId = jsonObj.id
-          this.exportResponse.timeElapse = '0:00'
-          var dlFileNameBased = `${req.body.dateFrom.substr(5, 5)} - ${req.body.dateTo.substr(5, 5)}`
-          console.log(dlFileNameBased)
-          this.exportResponse.downloadFileName = dlFileNameBased
-          var thisUser = this
-          setTimeout(function(){
-  			       thisUser.getMessageStoreReportTask()
-          }, 8000);
-          res.send(this.exportResponse)
-        }catch(e){
-    		  console.log(e)
-    	  }
-      }else{
-        console.log("TBI")
-      }
+      try{
+        var endpoint = "/restapi/v1.0/account/~/message-store-report"
+        var resp = await platform.post(endpoint, exportMessagesParams)
+    	  var jsonObj = await resp.json()
+        console.log(jsonObj.id)
+        get_message_store_report_task(jsonObj.id)
+      }catch(e){
+  		  console.log(e)
+  	  }
+      res.send({status:'ok', message:'creating'})
     },
-    pollExportResult: function(res){
-      var now = new Date().getTime()
-      now = (now - this.timing)/1000
-      var timeElapse = formatDurationTime(now)
-      console.log("Time elapse: " + timeElapse)
-      this.exportResponse.timeElapse = timeElapse
-      res.send(this.exportResponse)
-    },
-    getMessageStoreReportTask: async function(){
-      console.log("check task creation status ...")
-      var p = await this.getPlatform()
-      if (p){
-        try{
-          var endpoint = `/restapi/v1.0/account/~/message-store-report/${this.exportResponse.taskId}`
-          console.log(endpoint)
-      	  var resp = await p.get(endpoint)
-      	  var jsonObj = await resp.json()
-          console.log(jsonObj)
-
-          this.exportResponse.status ='ok'
-          this.exportResponse.taskStatus = jsonObj.status
-          this.exportResponse.taskId = jsonObj.id
-
-          if (jsonObj.status == 'Completed'){
-            console.log("COMPLETED")
-            this.getMessageStoreReportArchive()
-          }else{
-            var thisUser = this
-            setTimeout(function(){
-    			       thisUser.getMessageStoreReportTask()
-            }, 8000);
-          }
-        }catch(e){
-    		  console.log(e)
-        }
-      }else{
-        console.log("TBI")
-      }
-    },
-    getMessageStoreReportArchive: async function(){
-      console.log("getting report uri ...")
-      var p = await this.getPlatform()
-      if (p){
-        try{
-    	    var endpoint = `/restapi/v1.0/account/~/message-store-report/${this.exportResponse.taskId}/archive`
-          console.log(endpoint)
-    	    var resp = await p.get(endpoint)
-    	    var jsonObj = await resp.json()
-          console.log(jsonObj.records)
-    		  var date = new Date()
-          var dateStr = date.toISOString().replace(/:/g, '_')
-          console.log(dateStr)
-          var files = []
-          var downloadPath = `./message-store/${this.extensionId}/`
-          if(!fs.existsSync(downloadPath)){
-            fs.mkdirSync(downloadPath)
-          }
-    		  for (var i=0; i< jsonObj.records.length; i++){
-            var fileName = `${downloadPath}exported_data_${this.exportResponse.downloadFileName}_${i}.zip`
-            var u = new URL(jsonObj.records[i].uri)
-
-		        var domain = u.host
-		        var path = u.pathname
-            /*
-            var arr = jsonObj.records[i].uri.split("//")
-            var index = arr[1].indexOf('/')
-            var domain = arr[1].substring(0, index)
-            var path = arr[1].substring(index, arr[1].length)
-            */
-            console.log(domain)
-            console.log(path)
-            var tokenObj = await p.auth().data()
-            var accessToken = tokenObj.access_token
-            await download(domain, path, accessToken, fileName)
-            var downloadLink = `/downloads?filename=${fileName}`
-            files.push(downloadLink)
-    		  }
-          this.exportResponse.status ='ok'
-          this.exportResponse.taskStatus = 'Done'
-          this.exportResponse.downloadLinks = files
-          console.log("DONE")
-        }catch(e){
-    		  console.log(e)
-          this.exportResponse.status ='failed'
-        }
-      }else{
-        console.log("TBI")
-        this.exportResponse.status ='error'
-      }
-    },
-    readAccountCallLog: async function(req, res){
+    readAccountCallLog: function(req, res){
       var thisUser = this
       this.viewMode = req.body.view
       if (this.viewMode == 'None'){
@@ -384,6 +356,15 @@ var engine = User.prototype = {
           fs.unlinkSync(curPath);
         });
       }
+      /*
+      subfolder = `${thisUser.savedPath}faxes`
+      if (fs.existsSync(subfolder)) {
+        fs.readdirSync(subfolder).forEach((file, index) => {
+          const curPath = Path.join(subfolder, file);
+          fs.unlinkSync(curPath);
+        });
+      }
+      */
       // delete old .zip file
       var zipFile = `CallLog_${this.lastReadDateRange}_${this.getExtensionId()}.zip`
       if (fs.existsSync(zipFile))
@@ -392,118 +373,200 @@ var engine = User.prototype = {
 
       this.lastReadDateRange = `${req.body.dateFrom.split("T")[0]}_${req.body.dateTo.split("T")[0]}`
       //console.log(this.lastReadDateRange)
-      var p = await this.getPlatform()
-      if (p){
-      //this.rc_platform.getPlatform(function(err, p){
-        try {
-          this.startTime = Date.now()
-          this.timing = new Date().getTime()
-          this.readReport.readInProgress = true
-          this.readReport.readInfo =  "Reading first page"
-          var endpoint = '/restapi/v1.0/account/~/call-log'
-          var resp = await p.get(endpoint, this.readCallLogParams)
-          var jsonObj = await resp.json()
-          var jsonHeader = resp.headers //resp.response().headers
-          console.log(jsonHeader)
-          this.readReport.recordsCount = jsonObj.records.length
-          var navigationObj = jsonObj.navigation
-          this.hasNextPage = navigationObj.hasOwnProperty("nextPage")
-          console.log("downloadRecording: " + this.downloadRecording)
-          this.parseCallRecords(p, jsonObj.records, (err, result) => {
-              if (thisUser.hasNextPage){
-                jsonObj = null
-                thisUser.readCallLogNextPage(navigationObj.nextPage.uri)
-              }else{
-                console.log("readAccountCallLog: END HERE?")
+
+      this.rc_platform.getPlatform(function(err, p){
+        if (p != null){
+          thisUser.startTime = Date.now()
+          thisUser.timing = new Date().getTime()
+          thisUser.readReport.readInProgress = true
+          thisUser.readReport.readInfo =  "Reading first page"
+          var endpoint = '/account/~/call-log'
+          p.get(endpoint, thisUser.readCallLogParams)
+              .then(function (resp) {
+                var jsonObj = resp.json()
+                thisUser.readReport.recordsCount = jsonObj.records.length
+                //console.log("Total pages: " + JSON.stringify(jsonObj.paging))
+                //console.log("Total elements: " + jsonObj.paging.totalElements)
+                //thisUser.parseCallRecords(p, jsonObj.records)
+                var navigationObj = jsonObj.navigation
+                thisUser.hasNextPage = navigationObj.hasOwnProperty("nextPage")
+                console.log("downloadRecording: " + thisUser.downloadRecording)
+                thisUser.parseCallRecords(p, jsonObj.records, (err, result) => {
+                  if (thisUser.hasNextPage){
+                    jsonObj = null
+                    thisUser.readCallLogNextPage(navigationObj.nextPage.uri)
+                  }else{
+                    //thisUser.downloadAttachements(p)
+                    console.log("readAccountCallLog: END HERE?")
+                    thisUser.readReport.readInProgress = false
+                    thisUser.finalizeDownloadLink()
+                    /*
+                    if (thisUser.readReport.downloadCount == thisUser.readReport.attachmentCount){
+                      console.log("all files are downloaded")
+                      thisUser.readReport.downloadBinaryInProgress = false
+                      // make zip file and delete .csv file
+                      var zipFile = `CallLog_${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.zip`
+                      var zipper = require('zip-local');
+                      zipper.sync.zip("./"+thisUser.savedPath).compress().save(zipFile);
+
+                      thisUser.downloadLink = "/downloads?filename=" + zipFile
+                      console.log("check downloadLink")
+                      console.log(thisUser.downloadLink)
+                      // delete csv file
+                      if (fs.existsSync(thisUser.savedPath)) {
+                        fs.readdirSync(thisUser.savedPath).forEach((file, index) => {
+                          if (file.indexOf(".csv") > 0){
+                            const fileName = Path.join(thisUser.savedPath, file);
+                            fs.unlinkSync(fileName);
+                          }
+                        });
+                      }
+                      jsonObj = null
+                      zipper = null
+                      var pro = process.memoryUsage()
+                      console.log("Final Before Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
+                      try {
+                        if (global.gc) {
+                          global.gc();
+                        }
+                      } catch (e) {
+                        console.log("`node --expose-gc index.js`");
+                      }
+                      var pro = process.memoryUsage()
+                      console.log("Final After Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
+                    }
+                    thisUser.readReport.readInfo =  "Reading done!"
+                    */
+                  }
+                })
+              })
+              .catch(function(e){
+                console.log("readAccountCallLog Failed")
+                console.log(e.message)
+                thisUser.readReport.status = "error"
+                thisUser.readReport.downloadBinaryInProgress = false
                 thisUser.readReport.readInProgress = false
-                thisUser.finalizeDownloadLink()
-              }
-            })
-          }catch(e){
-            console.log("readAccountCallLog Failed")
-            console.log(e.message)
-            this.readReport.status = "error"
-            this.readReport.downloadBinaryInProgress = false
-            this.readReport.readInProgress = false
-            this.readReport.readInfo =  "You don't have permission to read this account call log!"
-          }
-      }else{
-        console.log("ERR" + err)
-      }
-    },
-    readCallLogNextPage: async function(url){
-      var thisUser = this
-      var p = await this.getPlatform()
-      if (p){
-        try {
-          var resp = await p.get(url)
-          var jsonObj = await resp.json()
-          this.readReport.readInProgress = true
-          this.readReport.readInfo =  "Reading page " + jsonObj.paging.page
-          this.readReport.recordsCount += jsonObj.records.length
-          this.hasNextPage = jsonObj.navigation.hasOwnProperty("nextPage")
-          console.log("downloadRecording next page: " + this.downloadRecording)
-          this.parseCallRecords(p, jsonObj.records, (err, result) => {
-            console.log("Then come here to continue!")
-            /*
-            var jsonHeader = resp.headers //resp.response().headers
-            //console.log(jsonHeader)
-            var limit = parseInt(jsonHeader['x-rate-limit-limit'][0]) // ['_headers']
-            var limitRemaining = parseInt(jsonHeader['x-rate-limit-remaining'][0])
-            var limitWindow = parseInt(jsonHeader['x-rate-limit-window'][0])
-            console.log("limitRemaining: " + limitRemaining)
-            */
-            var nextPageUri = ""
-            if (thisUser.hasNextPage)
-              nextPageUri = jsonObj.navigation.nextPage.uri
-
-            var pro = process.memoryUsage()
-            console.log("Before Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
-            thisUser.csvContent = null
-            resp = null
-            try {
-                if (global.gc) {
-                  console.log("calling gc")
-                  global.gc();
-                }
-            } catch (e) {
-                console.log("`node --expose-gc index.js`");
-                //process.exit();
-            }
-            var pro = process.memoryUsage()
-            console.log("After Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
-
-            if (thisUser.hasNextPage){
-              var delayInterval = 100
-              /*
-              if (limitRemaining == 0){
-                console.log("No remaining => calculate waiting time")
-                var now = Date.now()
-                var diff = now - thisUser.startTime
-                delayInterval = (limitWindow / limit) * 1000
-                thisUser.startTime = now + delayInterval
-              }
-              */
-              console.log("Read next page after " + delayInterval + " milliseconds")
-              setTimeout(function(){
-                thisUser.readCallLogNextPage(nextPageUri)
-              }, delayInterval, nextPageUri)
-            }else{
-              thisUser.readReport.readInProgress = false
-              console.log(`${thisUser.readReport.downloadCount} == ${thisUser.readReport.attachmentCount}`)
-              thisUser.finalizeDownloadLink()
-            }
-          })
-        }catch(e){
-            console.log("readCallLogNextPage Failed")
-            console.log(e.message)
-            // set error
-            this.readReport.status = "failed"
-            this.readReport.readInfo = e.message
-        }
-      }else{
+                thisUser.readReport.readInfo =  "You don't have permission to read this account call log!"
+              })
+        }else{
           console.log("ERR" + err)
         }
+      })
+    },
+    readCallLogNextPage: function(url){
+      var thisUser = this
+      //console.log(url)
+      this.rc_platform.getPlatform(function(err, p){
+        if (p != null){
+          p.get(url)
+            .then(function (resp) {
+              var jsonObj = resp.json()
+              //console.log("Total pages: " + JSON.stringify(jsonObj.paging))
+              //console.log("Total elements: " + jsonObj.paging.totalElements)
+              thisUser.readReport.readInProgress = true
+              thisUser.readReport.readInfo =  "Reading page " + jsonObj.paging.page
+              thisUser.readReport.recordsCount += jsonObj.records.length
+              //thisUser.parseCallRecords(p, jsonObj.records)
+              thisUser.hasNextPage = jsonObj.navigation.hasOwnProperty("nextPage")
+              console.log("downloadRecording next page: " + thisUser.downloadRecording)
+              thisUser.parseCallRecords(p, jsonObj.records, (err, result) => {
+                console.log("Then come here to continue!")
+                var jsonHeader = resp.response().headers
+                var limit = parseInt(jsonHeader['_headers']['x-rate-limit-limit'][0])
+                var limitRemaining = parseInt(jsonHeader['_headers']['x-rate-limit-remaining'][0])
+                var limitWindow = parseInt(jsonHeader['_headers']['x-rate-limit-window'][0])
+                console.log("limitRemaining: " + limitRemaining)
+
+                var nextPageUri = ""
+                if (thisUser.hasNextPage)
+                  nextPageUri = jsonObj.navigation.nextPage.uri
+
+                var pro = process.memoryUsage()
+                console.log("Before Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
+                thisUser.csvContent = null
+                resp = null
+                try {
+                  if (global.gc) {
+                    console.log("calling gc")
+                    global.gc();
+                  }
+                } catch (e) {
+                  console.log("`node --expose-gc index.js`");
+                  //process.exit();
+                }
+                var pro = process.memoryUsage()
+                console.log("After Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
+
+                if (thisUser.hasNextPage){
+                  var delayInterval = 100
+                  if (limitRemaining == 0){
+                      console.log("No remaining => calculate waiting time")
+                      var now = Date.now()
+                      var diff = now - thisUser.startTime
+                      delayInterval = (limitWindow / limit) * 1000
+                      thisUser.startTime = now + delayInterval
+                  }
+                  //var nextPageUri = navigationObj.nextPage.uri
+                  //navigationObj = null
+                  console.log("Read next page after " + delayInterval + " milliseconds")
+                  setTimeout(function(){
+                    thisUser.readCallLogNextPage(nextPageUri)
+                  }, delayInterval, nextPageUri)
+                }else{
+                  //thisUser.downloadAttachements(p)
+                  thisUser.readReport.readInProgress = false
+                  console.log(`${thisUser.readReport.downloadCount} == ${thisUser.readReport.attachmentCount}`)
+                  thisUser.finalizeDownloadLink()
+                  /*
+                  if (thisUser.readReport.downloadCount == thisUser.readReport.attachmentCount){
+                    console.log("all files are downloaded HERE?")
+                    thisUser.readReport.downloadBinaryInProgress = false
+                    // make zip file and delete .csv file
+                    var zipFile = `CallLog_${thisUser.lastReadDateRange}_${thisUser.getExtensionId()}.zip`
+                    var zipper = require('zip-local');
+                    zipper.sync.zip("./"+thisUser.savedPath).compress().save(zipFile);
+
+                    thisUser.downloadLink = "/downloads?filename=" + zipFile
+                    console.log("check downloadLink nextPage")
+                    console.log(thisUser.downloadLink)
+                    // delete csv file
+                    if (fs.existsSync(thisUser.savedPath)) {
+                      fs.readdirSync(thisUser.savedPath).forEach((file, index) => {
+                        if (file.indexOf(".csv") > 0){
+                          const fileName = Path.join(thisUser.savedPath, file);
+                          fs.unlinkSync(fileName);
+                        }
+                      });
+                    }
+                    zipper = null
+                    var pro = process.memoryUsage()
+                    console.log("Final Before Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
+                    try {
+                      if (global.gc) {
+                        global.gc();
+                      }
+                    } catch (e) {
+                      console.log("`node --expose-gc index.js`");
+                    }
+                    var pro = process.memoryUsage()
+                    console.log("Final After Heap Total: " + (pro.heapTotal/1024).toFixed(1) + ". Used: " + (pro.heapUsed/1024).toFixed(1))
+                  }
+                  thisUser.readReport.readInfo =  "Reading done!"
+                  */
+                }
+              })
+            })
+            .catch(function(e){
+              console.log("readCallLogNextPage Failed")
+              console.log(e.message)
+              // set error
+              thisUser.readReport.status = "failed"
+              thisUser.readReport.readInfo = e.message
+            })
+        }else{
+          console.log("ERR" + err)
+        }
+      })
     },
     parseCallRecords: function(p, records, cb){
       var thisUser = this
@@ -1061,28 +1124,6 @@ var engine = User.prototype = {
           });
       });
     },
-    createMessageStoreDownloadLinks: function(res){
-      console.log("createDownloadLinks")
-      var thisUser = this
-      thisUser.downloadLinks = []
-      //console.log(thisUser.downloadLink)
-      var userDownloadFile = `exported_data`
-      var dir = `${process.cwd()}/message-store/${this.extensionId}`
-      console.log(dir)
-        fs.readdirSync(dir).forEach((file, index) => {
-          console.log(file)
-          if (file.indexOf(userDownloadFile) >= 0){
-            thisUser.downloadLinks.push(`/downloads?filename=./message-store/${this.extensionId}/${file}`)
-            console.log('Download file name: ' + thisUser.downloadLinks)
-          }
-        });
-
-        res.send({
-            status:"ok",
-            downloadLinks:thisUser.downloadLinks,
-            exportStatus: this.exportResponse
-        })
-    },
     createDownloadLinks: function(res){
       console.log("createDownloadLinks")
       var thisUser = this
@@ -1167,20 +1208,25 @@ var engine = User.prototype = {
           })
        }
     },
-    logout: async function(callback){
+    logout: function(req, res, callback){
       console.log("LOGOUT FUNC")
-      var p = await this.getPlatform()
-      if (p){
-        try{
-          await p.logout()
+      var p = this.rc_platform.getPlatform(function(err, p){
+        if (p != null){
+          p.logout()
+            .then(function (token) {
+              console.log("logged out")
+              //p.auth().cancelAccessToken()
+              //p = null
+              callback(null, "ok")
+            })
+            .catch(function (e) {
+              console.log('ERR ' + e.message || 'Server cannot authorize user');
+              callback(e, e.message)
+            });
+        }else{
           callback(null, "ok")
-        }catch(e) {
-          console.log('ERR ' + e.message || 'Server cannot authorize user');
-          callback(e, e.message)
         }
-      }else{
-        callback(null, "ok")
-      }
+      })
     },
     postFeedbackToGlip: function(req){
       post_message_to_group(req.body, this.mainCompanyNumber, this.accountId)
@@ -1284,32 +1330,5 @@ const downloadFile = function(uri, dest, cb) {
       file.on('finish', function() {
           file.close(cb);
       });
-  });
-}
-
-const download = async function(domain, path, accessToken, dest) {
-  return new Promise((resolve, reject) => {
-    var file = fs.createWriteStream(dest);
-    var options = {
-          host: domain,
-          path: path,
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${accessToken}`
-          }
-      }
-      const req = https.request(options, res => {
-      console.log(`statusCode: ${res.statusCode}`)
-      res.pipe(file);
-      file.on('finish', function() {
-          file.close();
-          resolve('Done')
-      });
-    })
-    req.on('error', error => {
-      console.error(error)
-      reject(error)
-    })
-    req.end()
   });
 }
