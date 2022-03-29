@@ -24,7 +24,8 @@ function retrieveDownloadFile(){
   getting.done(function( res ) {
     if (res.status == "ok"){
       if (res.downloadLinks.length){
-        $("#last_session").css('display', 'block');
+        //$("#last_session").css('display', 'block')
+        $("#last_session").show()
         var dls = ''
         for (var link of res.downloadLinks){
           var parts = link.split('/')
@@ -42,7 +43,9 @@ function retrieveDownloadFile(){
   });
 }
 function exportMessageStore(){
-  $("#last_session").css('display', 'none');
+  //$("#last_session").css('display', 'none');
+  $("#links").hide()
+  $("#last_session").show()
   var configs = {}
   configs['dateFrom'] = $("#fromdatepicker").val() + "T00:00:00.001Z"
 
