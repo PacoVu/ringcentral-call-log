@@ -45,7 +45,7 @@ function retrieveDownloadFile(){
 function exportMessageStore(){
   //$("#last_session").css('display', 'none');
   $("#links").hide()
-  $("#last_session").show()
+  $("#last_session").hide()
   var configs = {}
   configs['dateFrom'] = $("#fromdatepicker").val() + "T00:00:00.001Z"
 
@@ -101,6 +101,7 @@ function pollResult(){
           dls += `<a href="javascript:downloadZipFile('${link}')">${fileName}</a><br/>`
           //var del = `<a id="delete_csv" href="javascript:deleteCallLogZipFileCallLog()" style="display: none">Delete Call Log (.zip)</a>`
         }
+        $('#links').show()
         $('#links').html(dls)
       }
     }else{
