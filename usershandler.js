@@ -130,6 +130,7 @@ var engine = User.prototype = {
           }
           if(!fs.existsSync(`message-store/`)){
             fs.mkdirSync(`message-store/`)
+            console.log("created message-store folder?")
           }
           console.log('logged_in');
           var thisRes = res
@@ -1072,6 +1073,7 @@ var engine = User.prototype = {
       var userDownloadFile = `exported_data`
       var dir = `${process.cwd()}/message-store/${this.extensionId}`
       console.log(dir)
+      try{
         fs.readdirSync(dir).forEach((file, index) => {
           console.log(file)
           if (file.indexOf(userDownloadFile) >= 0){
@@ -1079,12 +1081,18 @@ var engine = User.prototype = {
             console.log('Download file name: ' + thisUser.downloadLinks)
           }
         });
-
         res.send({
             status:"ok",
             downloadLinks:thisUser.downloadLinks,
             exportStatus: this.exportResponse
         })
+      }catch(e){
+        res.send({
+            status:"ok",
+            downloadLinks:[],
+            exportStatus: this.exportResponse
+        })
+      }
     },
     createDownloadLinks: function(res){
       console.log("createDownloadLinks")
