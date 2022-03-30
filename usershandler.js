@@ -189,7 +189,7 @@ var engine = User.prototype = {
       }
       var all = type.find(o => o == 'all')
       if (!all){
-        exportMessagesParams['messageType'] = type
+        exportMessagesParams['messageTypes'] = type
       }
       console.log(exportMessagesParams)
       var p = await this.getPlatform()
