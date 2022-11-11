@@ -149,9 +149,15 @@ var engine = User.prototype = {
 
               if (jsonObj.permissions.admin.enabled){
                 this.isAdmin = true
+
+                await this.getAccountExtensions("", (err, result) =>{
+                  callback(null, extensionId)
+                  res.send('login success');
+                })
+              }else{
+                callback(null, extensionId)
+                res.send('login success');
               }
-              callback(null, extensionId)
-              res.send('login success');
             }catch(e) {
                 console.log("Failed")
                 console.error(e);
@@ -166,6 +172,60 @@ var engine = User.prototype = {
       } else {
         res.send('No Auth code');
         callback("error", null)
+      }
+    },
+    getAccountExtensions: async function (uri, callback){
+      var endpoint = '/restapi/v1.0/account/~/extension'
+      var params = {
+          perPage: 1000
+      }
+
+      if (uri != ""){
+        endpoint = uri
+        params = {}
+      }
+      var p = await this.getPlatform()
+      if (p){
+        try {
+          var resp = await p.get(endpoint, params)
+          var jsonObj = await resp.json()
+          //console.log(jsonObj)
+          for (var record of jsonObj.records){
+              var site = {name: `Ext. Num: ${record.extensionNumber}`, code: `Ext. Id: ${record.id}`}
+              if (record.hasOwnProperty('site')){
+                    site.name = (record.site.hasOwnProperty('name')) ? record.site.name : site.name
+                    site.code = (record.site.hasOwnProperty('code')) ? record.site.code : site.code
+              }
+              var name = "Unknown"
+              if (record.hasOwnProperty('contact')){
+                    name = (record.contact.hasOwnProperty('firstName')) ? record.contact.firstName : ""
+                    name += (record.contact.hasOwnProperty('lastName')) ? ` ${record.contact.lastName}` : ""
+              }
+              var item = {
+                    id: record.id,
+                    name: `${record.extensionNumber} - ${name}`,
+                    site: `${site.name} - ${site.code}`
+              }
+              //item['id'] = record.id,
+              //item['name'] =`${record.extensionNumber} - ${record.contact.firstName} ${record.contact.lastName}`
+              this.extensionList.push(item)
+          }
+          if (jsonObj.navigation.hasOwnProperty("nextPage")){
+            console.log("read next page")
+            this.getAccountExtensions(jsonObj.navigation.nextPage.uri, callback)
+          }else{
+            jsonObj = null
+            console.log("COMPLETE getAccountExtensions")
+            console.log("Extensions: " + this.extensionList.length)
+            callback(null, "readAccountExtensions: DONE")
+          }
+        } catch(e){
+            console.log(e.message)
+              callback(null, "readAccountExtensions: FAILED")
+        }
+      }else{
+        console.log("No platform?")
+        callback(null, "readAccountExtensions: FAILED")
       }
     },
     pollReadCallLogResult: function(req, res){
