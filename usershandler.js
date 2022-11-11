@@ -149,12 +149,13 @@ var engine = User.prototype = {
 
               if (jsonObj.permissions.admin.enabled){
                 this.isAdmin = true
-
+                console.log("Admin user!")
                 await this.getAccountExtensions("", (err, result) =>{
                   callback(null, extensionId)
                   res.send('login success');
                 })
               }else{
+                console.log("Standard user!")
                 callback(null, extensionId)
                 res.send('login success');
               }
@@ -206,8 +207,6 @@ var engine = User.prototype = {
                     name: `${record.extensionNumber} - ${name}`,
                     site: `${site.name} - ${site.code}`
               }
-              //item['id'] = record.id,
-              //item['name'] =`${record.extensionNumber} - ${record.contact.firstName} ${record.contact.lastName}`
               this.extensionList.push(item)
           }
           if (jsonObj.navigation.hasOwnProperty("nextPage")){
@@ -216,7 +215,7 @@ var engine = User.prototype = {
           }else{
             jsonObj = null
             console.log("COMPLETE getAccountExtensions")
-            console.log("Extensions: " + this.extensionList.length)
+            console.log("Extension length: " + this.extensionList.length)
             callback(null, "readAccountExtensions: DONE")
           }
         } catch(e){
