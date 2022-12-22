@@ -57,7 +57,7 @@ function User(id, mode) {
 
   this.downloadRecording = false
   this.downloadVoicemail = false
-  this.download.attachment = false
+  this.downloadAttachements = false
   this.rc_platform = new RCPlatform(mode)
   this.timing = 0
   return this
@@ -351,7 +351,13 @@ var engine = User.prototype = {
             console.log(path)
             var tokenObj = await p.auth().data()
             var accessToken = tokenObj.access_token
-            await download(domain, path, accessToken, fileName)
+            //await download(domain, path, accessToken, fileName)
+            try {
+              await this.downloadFile_new(domain, path, accessToken, fileName)
+            }catch (e){
+              console.log(e)
+            }
+
             var downloadLink = `/downloads?filename=${fileName}`
             files.push(downloadLink)
     		  }
@@ -571,7 +577,7 @@ var engine = User.prototype = {
     parseCallRecords: function(p, records, cb){
       var thisUser = this
       async.eachSeries(records, function (record, done) {
-          setTimeout(function () {
+          setTimeout(async function () {
               var attachment = "-"
               if (record.hasOwnProperty("message")){
                 if (record.message.type == "VoiceMail" && thisUser.downloadVoicemail){
@@ -580,7 +586,7 @@ var engine = User.prototype = {
                   attachment = "voicemail/" + fileName
                   thisUser.readReport.attachmentCount++
                   thisUser.readReport.downloadBinaryInProgress = true
-                  thisUser.saveBinaryFile(p, "voicemail", fileName, voicemailUri)
+                  await thisUser.saveBinaryFile(p, "voicemail", fileName, voicemailUri)
                 }else if (record.message.type == "Fax" && thisUser.downloadAttachements){
                   if (record.direction == "Outbound" && record.result == "Sent"){
                     console.log("++++++ Fax Record with Attachments ++++++")
@@ -600,7 +606,7 @@ var engine = User.prototype = {
                 console.log(attachment)
                 thisUser.readReport.attachmentCount++
                 thisUser.readReport.downloadBinaryInProgress = true
-                thisUser.saveBinaryFile(p, "recordings", fileName, record.recording.contentUri)
+                await thisUser.saveBinaryFile(p, "recordings", fileName, record.recording.contentUri)
               }
               if (!thisUser.noCSV){
                 if (thisUser.viewMode == "Simple")
@@ -772,11 +778,11 @@ var engine = User.prototype = {
           .then(function (resp) {
             var jsonObj = resp.json()
             async.each(jsonObj.attachments,
-              function(attachment, callback){
+              async function(attachment, callback){
                 var fileNameExt = attachment.contentType.split("/")
                 var fileName = attachment.id + "." + fileNameExt[1]
                 thisUser.readReport.attachmentCount++
-                thisUser.saveBinaryFile(p, "faxes", fileName, attachment.uri)
+                await thisUser.saveBinaryFile(p, "faxes", fileName, attachment.uri)
               })
           })
           .catch(function(e){
@@ -1095,33 +1101,64 @@ var engine = User.prototype = {
       this.csvContent += legs
       master = null
     },
-    saveBinaryFile: function(p, type, fileName, contentUri){
+    saveBinaryFile: async function(p, type, fileName, contentUri){
       //console.log("saveBinaryFile")
       var dir = this.savedPath + type + "/"
       if(!fs.existsSync(dir)){
         fs.mkdirSync(dir)
       }
-      var thisUser = this
-      var uri = p.createUrl(contentUri, {addToken: true});
       var fullNamePath = dir + fileName
-      this.download(uri, fullNamePath, function(){
-        thisUser.readReport.downloadCount++
-        if (thisUser.readReport.downloadCount == thisUser.readReport.attachmentCount){
-          //console.log("file downloaded for this page")
-          thisUser.readReport.downloadBinaryInProgress = false
-          if (!thisUser.hasNextPage){
-            thisUser.finalizeDownloadLink()
-          }
+      var tokens = await p.auth().data();
+      await this.download_content_new(contentUri, fullNamePath, tokens.access_token)
+      this.readReport.downloadCount++
+      if (this.readReport.downloadCount == this.readReport.attachmentCount){
+        //console.log("file downloaded for this page")
+        this.readReport.downloadBinaryInProgress = false
+        if (!this.hasNextPage){
+          this.finalizeDownloadLink()
         }
-      })
+      }
     },
-    download: function(uri, dest, cb) {
-      var file = fs.createWriteStream(dest);
-      var request = https.get(uri, function(response) {
-          response.pipe(file);
-          file.on('finish', function() {
-              file.close(cb);
-          });
+    download_content_new: async function (contentUri, fileName, accessToken){
+      //console.log(contentUri)
+      var arr = contentUri.split("//")
+      var index = arr[1].indexOf('/')
+      var domain = arr[1].substring(0, index)
+      var path = arr[1].substring(index, arr[1].length)
+      //console.log(domain)
+      //console.log(path)
+      try {
+        await this.downloadFile_new(domain, path, accessToken, fileName)
+      }catch (e){
+        console.log(e)
+      }
+    },
+    downloadFile_new: async function (domain, path, accessToken, fileName){
+      return new Promise((resolve, reject) => {
+        var file = fs.createWriteStream(fileName);
+        var options = {
+                  host: domain,
+                  path: path,
+                  method: "GET",
+                  headers: {
+                    Authorization: `Bearer ${accessToken}`
+                  }
+              }
+        const req = https.request(options, res => {
+            console.log(`statusCode: ${res.statusCode}`)
+            res.pipe(file);
+            file.on('finish', function() {
+                file.close();
+                console.log("Save atttachment to the local machine.")
+                resolve("Saved")
+            });
+          })
+          req.on('error', error => {
+            console.error(error)
+            //resolve(null)
+            reject(error)
+          })
+          req.end()
       });
     },
     createMessageStoreDownloadLinks: function(res){
@@ -1200,7 +1237,7 @@ var engine = User.prototype = {
       }
       res.send({"status":"ok","message":"file deleted"})
     },
-    downloadAttachements: function(platform){
+    downloadAttachements_bu: function(platform){
       var thisUser = this
       var dir = this.savedPath + "recordings/"
       if(!fs.existsSync(dir)){
