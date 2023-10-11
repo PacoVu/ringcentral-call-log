@@ -269,7 +269,7 @@ var engine = User.prototype = {
           var thisUser = this
           setTimeout(function(){
   			       thisUser.getMessageStoreReportTask()
-          }, 8000);
+          }, 10000);
           res.send(this.exportResponse)
         }catch(e){
     		  console.log(e)
@@ -308,7 +308,7 @@ var engine = User.prototype = {
             var thisUser = this
             setTimeout(function(){
     			       thisUser.getMessageStoreReportTask()
-            }, 8000);
+            }, 10000);
           }
         }catch(e){
     		  console.log(e)

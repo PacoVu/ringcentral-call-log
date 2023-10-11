@@ -89,7 +89,7 @@ function pollResult(){
         $("#timelapse").html("Time lapse: " + res.timeElapse)
         window.setTimeout(function(){
           pollResult()
-        }, 8000)
+        }, 10000)
       }else if (res.taskStatus == 'Done'){
         disableInputs(false)
         $("#info").html(`Export task is completed. ${res.downloadLinks.length} files are ready for download.`)
