@@ -45,7 +45,7 @@ function readCallLogs(){
   var convertedDateFrom = new Date(ts).toISOString()
   configs['dateFrom'] = convertedDateFrom
 
-  var dateTo = $("#fromdatepicker").val() + "T23:59:59.999Z"
+  var dateTo = $("#todatepicker").val() + "T23:59:59.999Z"
   ts = new Date(dateTo).getTime() + timeOffset
   var convertedDateTo = new Date(ts).toISOString()
 
