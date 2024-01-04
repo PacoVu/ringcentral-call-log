@@ -48,8 +48,8 @@ function readCallLogs(){
   var dateTo = $("#todatepicker").val() + "T23:59:59.999Z"
   ts = new Date(dateTo).getTime() + timeOffset
   var convertedDateTo = new Date(ts).toISOString()
-
   configs['dateTo'] = convertedDateTo
+
   if ($('#extensionids') != undefined) {
     configs['extensionList'] = JSON.stringify($('#extensionids').val());
   }else{
