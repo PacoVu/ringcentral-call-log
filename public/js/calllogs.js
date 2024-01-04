@@ -40,9 +40,16 @@ function retrieveDownloadFile(){
 function readCallLogs(){
   $("#last_session").css('display', 'none');
   var configs = {}
-  configs['dateFrom'] = $("#fromdatepicker").val() + "T00:00:00.001Z"
+  var dateFrom = $("#fromdatepicker").val() + "T00:00:00.001Z"
+  var ts = new Date(dateFrom).getTime() + timeOffset
+  var convertedDateFrom = new Date(ts).toISOString()
+  configs['dateFrom'] = convertedDateFrom
 
-  configs['dateTo'] = $("#todatepicker").val() + "T23:59:59.999Z"
+  var dateTo = $("#fromdatepicker").val() + "T23:59:59.999Z"
+  ts = new Date(dateTo).getTime() + timeOffset
+  var convertedDateTo = new Date(ts).toISOString()
+
+  configs['dateTo'] = convertedDateTo
   if ($('#extensionids') != undefined) {
     configs['extensionList'] = JSON.stringify($('#extensionids').val());
   }else{
@@ -51,7 +58,7 @@ function readCallLogs(){
   configs['view'] = $("#view").val()
   configs['attachments'] = JSON.stringify($('#attachments').val());
   configs['timeOffset'] = timeOffset
-  //return alert (JSON.stringify(configs))
+
   var url = "readlogs"
   var posting = $.post( url, configs );
   disableInputs(true)
@@ -60,10 +67,7 @@ function readCallLogs(){
     if (res.status != "ok") {
       alert(res.calllog_error)
     }else{
-      //$("#progress").toggleClass("show")
-      //$("#readingAni").css('display', 'inline');
       pollResult()
-      //window.location = "recordedcalls"
     }
   });
   posting.fail(function(response){
